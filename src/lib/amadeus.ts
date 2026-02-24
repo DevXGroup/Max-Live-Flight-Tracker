@@ -141,7 +141,7 @@ export async function getFlightStatusFromAmadeus(
 
         const flight = data.data[0];
         const departure = flight.flightPoints[0];
-        const arrival = flight.flightPoints[1];
+        const arrival = flight.flightPoints[flight.flightPoints.length - 1];
 
         // Extract times
         const getTime = (timings: Array<{ qualifier: string; value: string }>, qualifier: string) => {

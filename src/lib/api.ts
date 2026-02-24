@@ -449,16 +449,23 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
 
         } else if (openSkyData && openSkyData.latitude && openSkyData.longitude) {
             console.log('⚠️ No Schedule found, but Flight is Active on OpenSky');
-            // Fallback to OpenSky-only logic (what we had before)
             const isLanded = openSkyData.on_ground;
+
+            // Resolve airline name from parsed carrier code, fallback to origin country
+            const airlineName = parsed?.carrierCode
+                ? (getAirlineName(parsed.carrierCode) !== parsed.carrierCode
+                    ? getAirlineName(parsed.carrierCode)
+                    : openSkyData.origin_country)
+                : openSkyData.origin_country;
+
             const flightStatus: FlightStatus = {
                 flightNumber: openSkyData.callsign?.trim() || flightNumber,
                 flightDate: now.toISOString().split('T')[0],
-                airline: openSkyData.origin_country,
+                airline: airlineName,
                 status: isLanded ? 'Landed' : 'Active',
                 departure: {
                     airport: 'Unknown',
-                    code: '???',
+                    code: '---',
                     terminal: 'N/A',
                     gate: 'N/A',
                     scheduledTime: new Date(openSkyData.last_contact * 1000).toISOString(),
@@ -468,7 +475,7 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
                 },
                 arrival: {
                     airport: 'Unknown',
-                    code: '???',
+                    code: '---',
                     terminal: 'N/A',
                     gate: 'N/A',
                     scheduledTime: new Date(openSkyData.last_contact * 1000 + 7200000).toISOString(),
@@ -492,22 +499,59 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
                 },
             };
 
-            // Try AviationStack fallback for codes
+            // Try to get departure/arrival airports from OpenSky flights endpoint using ICAO24
             try {
-                // Use existing function directly
-                const avData = await getFlightDataFromAviationStack(flightNumber);
-                if (avData) {
-                    flightStatus.departure.code = avData.departure.code;
-                    flightStatus.departure.airport = avData.departure.airport;
-                    flightStatus.arrival.code = avData.arrival.code;
-                    flightStatus.arrival.airport = avData.arrival.airport;
-                    // Update coords
-                    const depCoords = getAirportCoords(avData.departure.code);
-                    if (depCoords) { flightStatus.departure.latitude = depCoords.lat; flightStatus.departure.longitude = depCoords.lng; }
-                    const arrCoords = getAirportCoords(avData.arrival.code);
-                    if (arrCoords) { flightStatus.arrival.latitude = arrCoords.lat; flightStatus.arrival.longitude = arrCoords.lng; }
+                const { getFlightRouteFromOpenSky } = await import('./opensky');
+                const { icaoToIata } = await import('./airports');
+                const route = await getFlightRouteFromOpenSky(openSkyData.icao24);
+                console.log('🗺️ OpenSky route data:', route);
+
+                if (route?.departureIcao) {
+                    const iata = icaoToIata(route.departureIcao);
+                    if (iata) {
+                        flightStatus.departure.code = iata;
+                        const coords = getAirportCoords(iata);
+                        if (coords) {
+                            flightStatus.departure.airport = coords.name;
+                            flightStatus.departure.latitude = coords.lat;
+                            flightStatus.departure.longitude = coords.lng;
+                        }
+                    }
                 }
-            } catch (e) { console.warn('AviationStack fallback failed', e); }
+                if (route?.arrivalIcao) {
+                    const iata = icaoToIata(route.arrivalIcao);
+                    if (iata) {
+                        flightStatus.arrival.code = iata;
+                        const coords = getAirportCoords(iata);
+                        if (coords) {
+                            flightStatus.arrival.airport = coords.name;
+                            flightStatus.arrival.latitude = coords.lat;
+                            flightStatus.arrival.longitude = coords.lng;
+                        }
+                    }
+                }
+            } catch (e) { console.warn('OpenSky route lookup failed', e); }
+
+            // Try AviationStack fallback for codes if we still don't have them
+            if (flightStatus.departure.code === '---' || flightStatus.arrival.code === '---') {
+                try {
+                    const avData = await getFlightDataFromAviationStack(flightNumber);
+                    if (avData) {
+                        if (flightStatus.departure.code === '---') {
+                            flightStatus.departure.code = avData.departure.code;
+                            flightStatus.departure.airport = avData.departure.airport;
+                            const depCoords = getAirportCoords(avData.departure.code);
+                            if (depCoords) { flightStatus.departure.latitude = depCoords.lat; flightStatus.departure.longitude = depCoords.lng; }
+                        }
+                        if (flightStatus.arrival.code === '---') {
+                            flightStatus.arrival.code = avData.arrival.code;
+                            flightStatus.arrival.airport = avData.arrival.airport;
+                            const arrCoords = getAirportCoords(avData.arrival.code);
+                            if (arrCoords) { flightStatus.arrival.latitude = arrCoords.lat; flightStatus.arrival.longitude = arrCoords.lng; }
+                        }
+                    }
+                } catch (e) { console.warn('AviationStack fallback failed', e); }
+            }
 
             return flightStatus;
         }
