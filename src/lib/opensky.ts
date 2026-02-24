@@ -24,25 +24,37 @@ export interface OpenSkyResponse {
     states: any[][] | null;
 }
 
-// Convert IATA flight number to ICAO24 hex code (this is a limitation - we need the aircraft's ICAO code)
-// For now, we'll search by callsign which often matches the flight number
+// In-memory cache for the states/all response (30 second TTL)
+let statesCache: { data: OpenSkyResponse; timestamp: number } | null = null;
+const STATES_CACHE_TTL_MS = 30_000;
+
+async function fetchAllStates(): Promise<OpenSkyResponse> {
+    const now = Date.now();
+    if (statesCache && now - statesCache.timestamp < STATES_CACHE_TTL_MS) {
+        console.log('📦 OpenSky: using cached states data');
+        return statesCache.data;
+    }
+
+    const response = await fetch('https://opensky-network.org/api/states/all');
+
+    if (!response.ok) {
+        if (response.status === 429) {
+            throw new Error('OpenSky rate limit exceeded. Please wait 10 seconds before trying again.');
+        }
+        throw new Error(`OpenSky API error: ${response.status}`);
+    }
+
+    const data: OpenSkyResponse = await response.json();
+    statesCache = { data, timestamp: now };
+    return data;
+}
+
+// Search for a flight by callsign/flight number in the current OpenSky state
 export async function getFlightFromOpenSky(flightNumber: string): Promise<OpenSkyState | null> {
     try {
         console.log('🛰️ Calling OpenSky Network API for:', flightNumber);
 
-        // OpenSky API endpoint - get all current flights
-        const response = await fetch('https://opensky-network.org/api/states/all');
-
-        if (!response.ok) {
-            if (response.status === 429) {
-                console.error('⚠️ OpenSky rate limit exceeded. Please wait 10 seconds before searching again.');
-                throw new Error('OpenSky rate limit exceeded. Please wait a moment and try again.');
-            }
-            console.error('OpenSky API error:', response.status);
-            return null;
-        }
-
-        const data: OpenSkyResponse = await response.json();
+        const data = await fetchAllStates();
 
         if (!data.states || data.states.length === 0) {
             console.log('No flights found in OpenSky data');

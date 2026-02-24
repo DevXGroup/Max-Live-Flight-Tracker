@@ -559,6 +559,10 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
         return null;
 
     } catch (error) {
+        // Propagate rate-limit errors to the UI so users see a useful message
+        if (error instanceof Error && error.message.toLowerCase().includes('rate limit')) {
+            throw error;
+        }
         console.error('Smart Flight Data Error:', error);
         return null;
     }
