@@ -223,15 +223,86 @@ function toTitleCase(str: string) {
     }).join(' ');
 }
 
+// ICAO (3-letter) to IATA (2-letter) airline code mapping
+// Amadeus API requires IATA codes, but users often search with ICAO codes
+const ICAO_TO_IATA: Record<string, string> = {
+    'AAL': 'AA', // American Airlines
+    'ACA': 'AC', // Air Canada
+    'AFR': 'AF', // Air France
+    'AIC': 'AI', // Air India
+    'AMX': 'AM', // Aeromexico
+    'ASA': 'AS', // Alaska Airlines
+    'FIN': 'AY', // Finnair
+    'ITY': 'AZ', // ITA Airways
+    'BAW': 'BA', // British Airways
+    'JBU': 'B6', // JetBlue
+    'EVA': 'BR', // EVA Air
+    'CCA': 'CA', // Air China
+    'CAL': 'CI', // China Airlines
+    'CPA': 'CX', // Cathay Pacific
+    'CSN': 'CZ', // China Southern
+    'DAL': 'DL', // Delta Air Lines
+    'UAE': 'EK', // Emirates
+    'ETD': 'EY', // Etihad Airways
+    'FFT': 'F9', // Frontier Airlines
+    'IBE': 'IB', // Iberia
+    'JAL': 'JL', // Japan Airlines
+    'KAL': 'KE', // Korean Air
+    'KLM': 'KL', // KLM
+    'DLH': 'LH', // Lufthansa
+    'SWR': 'LX', // Swiss International Air Lines
+    'CES': 'MU', // China Eastern
+    'ANA': 'NH', // All Nippon Airways
+    'NKS': 'NK', // Spirit Airlines
+    'ANZ': 'NZ', // Air New Zealand
+    'AUA': 'OS', // Austrian Airlines
+    'AAR': 'OZ', // Asiana Airlines
+    'QFA': 'QF', // Qantas
+    'QTR': 'QR', // Qatar Airways
+    'SAS': 'SK', // SAS
+    'SIA': 'SQ', // Singapore Airlines
+    'AFL': 'SU', // Aeroflot
+    'THY': 'TK', // Turkish Airlines
+    'UAL': 'UA', // United Airlines
+    'VIR': 'VS', // Virgin Atlantic
+    'SWA': 'WN', // Southwest Airlines
+    'WJA': 'WS', // WestJet
+    'UPS': 'UPS', // UPS (2-letter IATA is 5X but Amadeus may use UPS)
+    'FDX': 'FX', // FedEx
+    'RYR': 'FR', // Ryanair
+    'EZY': 'U2', // easyJet
+    'WZZ': 'W6', // Wizz Air
+    'TAP': 'TP', // TAP Air Portugal
+    'SWG': 'ZK', // Great Lakes Airlines
+    'VOI': 'VY', // Vueling
+    'RPA': 'YX', // Republic Airways
+    'ENY': 'MQ', // Envoy Air (American Eagle)
+    'SKW': 'OO', // SkyWest Airlines
+    'JZA': 'QK', // Jazz Aviation (Air Canada Express)
+    'AJM': 'GP', // APG Airlines
+};
+
 // Helper to extract carrier code and flight number from a flight number string
-export function parseFlightNumber(flightNumber: string): { carrierCode: string; flightNum: string } | null {
+export function parseFlightNumber(flightNumber: string): { carrierCode: string; icaoCode: string | null; flightNum: string } | null {
     // Match both 2-letter (IATA) and 3-letter (ICAO) codes
-    // Examples: BA36, UPS56, BAW36
+    // Examples: BA36, UPS56, BAW36, ACA794
     const match = flightNumber.match(/^([A-Z]{2,3})(\d+)$/i);
     if (!match) return null;
 
+    const originalCode = match[1].toUpperCase();
+    let carrierCode = originalCode;
+    let icaoCode: string | null = null;
+
+    // Convert 3-letter ICAO code to 2-letter IATA code for Amadeus API
+    if (originalCode.length === 3 && ICAO_TO_IATA[originalCode]) {
+        console.log(`🔄 Converting ICAO code ${originalCode} → IATA code ${ICAO_TO_IATA[originalCode]}`);
+        icaoCode = originalCode;
+        carrierCode = ICAO_TO_IATA[originalCode];
+    }
+
     return {
-        carrierCode: match[1].toUpperCase(),
+        carrierCode,
+        icaoCode,
         flightNum: match[2],
     };
 }

@@ -54,25 +54,35 @@ export async function getFlightFromOpenSky(flightNumber: string): Promise<OpenSk
         const parsed = parseFlightNumber(normalizedInput);
         let flightState: any[] | undefined;
 
-        // First try exact carrier+number match if we could parse
-        if (parsed) {
-            const { carrierCode, flightNum } = parsed;
-            flightState = data.states.find(state => {
-                const cs = state[1]?.toString().trim().toUpperCase().replace(/\s/g, '') || '';
-                return cs.startsWith(carrierCode) && cs.endsWith(flightNum);
-            });
+        // First try exact match with raw input (handles ICAO callsigns like ACA794)
+        flightState = data.states.find(state => {
+            const cs = state[1]?.toString().trim().toUpperCase().replace(/\s/g, '') || '';
+            return cs === normalizedInput;
+        });
+
+        // Try matching with ICAO code + flight number (OpenSky uses ICAO callsigns)
+        if (!flightState && parsed) {
+            const { carrierCode, icaoCode, flightNum } = parsed;
+
+            // If user entered ICAO code, try it directly; also try IATA code
+            const codesToTry = icaoCode ? [icaoCode, carrierCode] : [carrierCode];
+
+            for (const code of codesToTry) {
+                if (flightState) break;
+                flightState = data.states.find(state => {
+                    const cs = state[1]?.toString().trim().toUpperCase().replace(/\s/g, '') || '';
+                    return cs.startsWith(code) && cs.endsWith(flightNum);
+                });
+            }
         }
 
-        // Fallback to previous heuristic if not found
-        if (!flightState) {
-            const iataCode = normalizedInput.substring(0, 2); // e.g., AA
-            const flightNum = normalizedInput.substring(2);   // e.g., 123
+        // Fallback to looser heuristic if not found
+        if (!flightState && parsed) {
+            const { flightNum } = parsed;
             flightState = data.states.find((state) => {
                 const callsign = state[1]?.toString().trim().toUpperCase().replace(/\s/g, '') || '';
-                // Direct match
-                if (callsign === normalizedInput) return true;
-                // Loose match: contains flight number and starts with likely airline code
-                if (callsign.includes(flightNum) && (callsign.startsWith(iataCode) || callsign.length > flightNum.length)) {
+                // Loose match: contains flight number
+                if (callsign.includes(flightNum) && callsign.length > flightNum.length) {
                     return true;
                 }
                 return false;
