@@ -45,7 +45,7 @@ const AVIATION_STACK_KEY = process.env.NEXT_PUBLIC_AVIATION_STACK_KEY;
 
 // Data source configuration
 export type DataSource = 'aviationstack' | 'opensky' | 'hybrid';
-export const DATA_SOURCE: DataSource = 'hybrid'; // Force OpenSky + Amadeus enrichment
+export const DATA_SOURCE: DataSource = 'opensky'; // Full chain: Amadeus → AviationStack (schedule) + OpenSky → adsb.fi → airplanes.live (position)
 
 console.log('🔧 Flight data source:', DATA_SOURCE);
 
@@ -247,9 +247,11 @@ async function getFlightDataHybrid(flightNumber: string): Promise<FlightStatus |
     return aviationStackData;
 }
 
-// Smart Flight Data: Amadeus (Schedule) + OpenSky (Live Position)
+// Smart Flight Data with full call chain:
+//   Schedule: [1] Amadeus (today→tomorrow→yesterday) → [2] Amadeus with actual callsign → [3] AviationStack
+//   Position: [1] OpenSky → [2] adsb.fi → [3] airplanes.live  (via getFlightFromOpenSky)
 async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightStatus | null> {
-    console.log('🛰️ Getting Smart Flight Data for:', flightNumber);
+    console.log('🔍 Flight data chain starting for:', flightNumber);
 
     try {
         const { getFlightFromOpenSky } = await import('./opensky');
@@ -257,44 +259,87 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
         const { getAirportCoords, calculateDistance } = await import('./airports');
         const { getAirlineName } = await import('./utils');
 
-        // 1. Try to get Schedule from Amadeus (Today, Tomorrow, Yesterday)
-        let amadeusData = null;
         const parsed = parseFlightNumber(flightNumber);
         const now = new Date();
         const today = now.toISOString().split('T')[0];
+        const tomorrowDate = new Date(now); tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+        const yesterdayDate = new Date(now); yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        const tomorrow = tomorrowDate.toISOString().split('T')[0];
+        const yesterday = yesterdayDate.toISOString().split('T')[0];
 
-        if (!hasAmadeusCredentials) {
-            console.log('⚠️ Amadeus credentials not configured, skipping schedule lookup');
-        } else if (parsed) {
-            // Calculate tomorrow
-            const tomorrowDate = new Date(now);
-            tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-            const tomorrow = tomorrowDate.toISOString().split('T')[0];
+        // Helper: try Amadeus for today/tomorrow/yesterday given carrier+flightNum
+        async function tryAmadeus(carrier: string, num: string): Promise<any> {
+            return (
+                await getFlightStatusFromAmadeus(carrier, num, today) ||
+                await getFlightStatusFromAmadeus(carrier, num, tomorrow) ||
+                await getFlightStatusFromAmadeus(carrier, num, yesterday)
+            ) ?? null;
+        }
 
-            // Calculate yesterday
-            const yesterdayDate = new Date(now);
-            yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-            const yesterday = yesterdayDate.toISOString().split('T')[0];
+        // ── SCHEDULE CHAIN ────────────────────────────────────────────────────
+        let amadeusData: any = null;
 
-            console.log(`📅 Checking schedule for ${parsed.carrierCode}${parsed.flightNum}...`);
-            amadeusData = await getFlightStatusFromAmadeus(parsed.carrierCode, parsed.flightNum, today);
+        // [S1] Amadeus with searched flight number
+        if (hasAmadeusCredentials && parsed) {
+            console.log(`📅 [S1] Amadeus schedule for ${parsed.carrierCode}${parsed.flightNum}...`);
+            amadeusData = await tryAmadeus(parsed.carrierCode, parsed.flightNum);
+            if (amadeusData) console.log('✅ [S1] Schedule found via Amadeus');
+            else console.log('   ↳ not found, will retry with actual callsign after position lookup');
+        } else if (!hasAmadeusCredentials) {
+            console.log('⚠️ [S1] Amadeus credentials not configured, skipping');
+        }
 
-            if (!amadeusData) {
-                console.log(`📅 Not found for today, checking tomorrow (${tomorrow})...`);
-                amadeusData = await getFlightStatusFromAmadeus(parsed.carrierCode, parsed.flightNum, tomorrow);
-            }
+        // ── POSITION CHAIN ────────────────────────────────────────────────────
+        // getFlightFromOpenSky internally chains: [P1] OpenSky → [P2] adsb.fi → [P3] airplanes.live
+        console.log('📡 [P1→P3] Live position chain for:', flightNumber);
+        const openSkyData = await getFlightFromOpenSky(flightNumber);
 
-            if (!amadeusData) {
-                console.log(`📅 Not found for tomorrow, checking yesterday (${yesterday})...`);
-                amadeusData = await getFlightStatusFromAmadeus(parsed.carrierCode, parsed.flightNum, yesterday);
+        // ── SCHEDULE CHAIN (continued) ────────────────────────────────────────
+        // [S2] Retry Amadeus with the actual broadcasting callsign (may differ from user input)
+        if (!amadeusData && hasAmadeusCredentials && openSkyData?.callsign) {
+            const actualCallsign = openSkyData.callsign.trim().replace(/\s/g, '').toUpperCase();
+            const parsedActual = parseFlightNumber(actualCallsign);
+            if (parsedActual && actualCallsign !== flightNumber.toUpperCase().replace(/\s/g, '')) {
+                console.log(`📅 [S2] Retrying Amadeus with actual callsign: ${actualCallsign}`);
+                amadeusData = await tryAmadeus(parsedActual.carrierCode, parsedActual.flightNum);
+                if (amadeusData) console.log('✅ [S2] Schedule found via Amadeus (actual callsign)');
             }
         }
 
-        // 2. Try to get Live Position from OpenSky
-        // We only check OpenSky if the flight is likely active or we need to confirm it's not
-        const openSkyData = await getFlightFromOpenSky(flightNumber);
+        // [S3] AviationStack — try both original query and actual callsign
+        if (!amadeusData) {
+            const callsignToTry = openSkyData?.callsign?.trim().replace(/\s/g, '') || flightNumber;
+            console.log(`📅 [S3] AviationStack for: ${callsignToTry}`);
+            try {
+                const avSchedule = callsignToTry !== flightNumber
+                    ? await getFlightDataFromAviationStack(callsignToTry) || await getFlightDataFromAviationStack(flightNumber)
+                    : await getFlightDataFromAviationStack(flightNumber);
+                if (avSchedule) {
+                    console.log('✅ [S3] Schedule found via AviationStack');
+                    // Wrap AviationStack result in amadeus-like shape so we can reuse the builder below
+                    amadeusData = {
+                        _fromAviationStack: avSchedule,
+                    };
+                }
+            } catch { /* AviationStack failure is non-fatal */ }
+        }
 
-        // 3. Construct Flight Status
+        // ── BUILD RESULT ──────────────────────────────────────────────────────
+
+        // [S3 path] AviationStack returned a full FlightStatus — enhance with live position and return
+        if (amadeusData?._fromAviationStack) {
+            const result: FlightStatus = amadeusData._fromAviationStack;
+            if (openSkyData?.latitude && openSkyData?.longitude) {
+                result.liveData.latitude = openSkyData.latitude;
+                result.liveData.longitude = openSkyData.longitude;
+                result.aircraft.speed = openSkyData.velocity ? Math.round(openSkyData.velocity * 1.94384) : result.aircraft.speed;
+                result.aircraft.altitude = openSkyData.baro_altitude || openSkyData.geo_altitude || result.aircraft.altitude;
+                result.aircraft.heading = openSkyData.true_track || result.aircraft.heading;
+            }
+            return result;
+        }
+
+        // [S1/S2 path] Amadeus returned schedule data — build rich result
         if (amadeusData) {
             console.log('✅ Found Schedule Data from Amadeus');
 
@@ -498,23 +543,19 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
                 },
             };
 
-            // Try to get departure/arrival airports from OpenSky flights endpoint using ICAO24
+            // ── AIRPORT RESOLUTION CHAIN ──────────────────────────────────────
+            // [A1] OpenSky historical flights endpoint (ICAO24-based)
             try {
                 const { getFlightRouteFromOpenSky } = await import('./opensky');
                 const { icaoToIata } = await import('./airports');
+                console.log('🗺️ [A1] OpenSky route lookup for ICAO24:', openSkyData.icao24);
                 const route = await getFlightRouteFromOpenSky(openSkyData.icao24);
-                console.log('🗺️ OpenSky route data:', route);
-
                 if (route?.departureIcao) {
                     const iata = icaoToIata(route.departureIcao);
                     if (iata) {
                         flightStatus.departure.code = iata;
                         const coords = getAirportCoords(iata);
-                        if (coords) {
-                            flightStatus.departure.airport = coords.name;
-                            flightStatus.departure.latitude = coords.lat;
-                            flightStatus.departure.longitude = coords.lng;
-                        }
+                        if (coords) { flightStatus.departure.airport = coords.name; flightStatus.departure.latitude = coords.lat; flightStatus.departure.longitude = coords.lng; }
                     }
                 }
                 if (route?.arrivalIcao) {
@@ -522,19 +563,50 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
                     if (iata) {
                         flightStatus.arrival.code = iata;
                         const coords = getAirportCoords(iata);
-                        if (coords) {
-                            flightStatus.arrival.airport = coords.name;
-                            flightStatus.arrival.latitude = coords.lat;
-                            flightStatus.arrival.longitude = coords.lng;
-                        }
+                        if (coords) { flightStatus.arrival.airport = coords.name; flightStatus.arrival.latitude = coords.lat; flightStatus.arrival.longitude = coords.lng; }
                     }
                 }
-            } catch (e) { console.warn('OpenSky route lookup failed', e); }
+                if (route?.departureIcao || route?.arrivalIcao) console.log('✅ [A1] Airports resolved via OpenSky route');
+            } catch (e) { console.warn('[A1] OpenSky route lookup failed:', e); }
 
-            // Try AviationStack fallback for codes if we still don't have them
+            // [A2] Amadeus schedule lookup using the actual broadcasting callsign
+            if ((flightStatus.departure.code === '---' || flightStatus.arrival.code === '---') && hasAmadeusCredentials) {
+                const actualCallsign = openSkyData.callsign?.trim().replace(/\s/g, '').toUpperCase() || flightNumber;
+                const parsedCallsign = parseFlightNumber(actualCallsign);
+                if (parsedCallsign) {
+                    try {
+                        console.log(`📅 [A2] Amadeus airport lookup for callsign: ${actualCallsign}`);
+                        const aData = await tryAmadeus(parsedCallsign.carrierCode, parsedCallsign.flightNum);
+                        if (aData) {
+                            if (flightStatus.departure.code === '---' && aData.departure?.iataCode) {
+                                flightStatus.departure.code = aData.departure.iataCode;
+                                const coords = getAirportCoords(aData.departure.iataCode);
+                                if (coords) { flightStatus.departure.airport = coords.name; flightStatus.departure.latitude = coords.lat; flightStatus.departure.longitude = coords.lng; }
+                                else flightStatus.departure.airport = await getAirportName(aData.departure.iataCode) || aData.departure.iataCode;
+                            }
+                            if (flightStatus.arrival.code === '---' && aData.arrival?.iataCode) {
+                                flightStatus.arrival.code = aData.arrival.iataCode;
+                                const coords = getAirportCoords(aData.arrival.iataCode);
+                                if (coords) { flightStatus.arrival.airport = coords.name; flightStatus.arrival.latitude = coords.lat; flightStatus.arrival.longitude = coords.lng; }
+                                else flightStatus.arrival.airport = await getAirportName(aData.arrival.iataCode) || aData.arrival.iataCode;
+                            }
+                            if (aData.departure?.iataCode || aData.arrival?.iataCode) console.log('✅ [A2] Airports resolved via Amadeus');
+                        }
+                    } catch (e) { console.warn('[A2] Amadeus callsign lookup failed:', e); }
+                }
+            }
+
+            // [A3] AviationStack — try actual callsign first, then original query
             if (flightStatus.departure.code === '---' || flightStatus.arrival.code === '---') {
+                const actualCallsign = openSkyData.callsign?.trim().replace(/\s/g, '') || flightNumber;
+                const queriesToTry = [...new Set([actualCallsign, flightNumber])];
+                console.log(`📅 [A3] AviationStack airport lookup for: ${queriesToTry.join(', ')}`);
                 try {
-                    const avData = await getFlightDataFromAviationStack(flightNumber);
+                    let avData: FlightStatus | null = null;
+                    for (const q of queriesToTry) {
+                        avData = await getFlightDataFromAviationStack(q);
+                        if (avData) break;
+                    }
                     if (avData) {
                         if (flightStatus.departure.code === '---') {
                             flightStatus.departure.code = avData.departure.code;
@@ -548,8 +620,9 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
                             const arrCoords = getAirportCoords(avData.arrival.code);
                             if (arrCoords) { flightStatus.arrival.latitude = arrCoords.lat; flightStatus.arrival.longitude = arrCoords.lng; }
                         }
+                        console.log('✅ [A3] Airports resolved via AviationStack');
                     }
-                } catch (e) { console.warn('AviationStack fallback failed', e); }
+                } catch (e) { console.warn('[A3] AviationStack fallback failed:', e); }
             }
 
             return flightStatus;

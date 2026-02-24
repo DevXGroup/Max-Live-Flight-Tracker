@@ -39,7 +39,7 @@ async function fetchAllStates(): Promise<OpenSkyResponse> {
 
     if (!response.ok) {
         if (response.status === 429) {
-            throw new Error('OpenSky rate limit exceeded. Please wait 10 seconds before trying again.');
+            throw new Error('OpenSky rate limit exceeded.');
         }
         throw new Error(`OpenSky API error: ${response.status}`);
     }
@@ -49,85 +49,154 @@ async function fetchAllStates(): Promise<OpenSkyResponse> {
     return data;
 }
 
-// Search for a flight by callsign/flight number in the current OpenSky state
-export async function getFlightFromOpenSky(flightNumber: string): Promise<OpenSkyState | null> {
-    try {
-        console.log('🛰️ Calling OpenSky Network API for:', flightNumber);
+// Map a raw OpenSky state array to OpenSkyState
+function mapStateArray(state: any[]): OpenSkyState {
+    return {
+        icao24: state[0],
+        callsign: state[1],
+        origin_country: state[2],
+        time_position: state[3],
+        last_contact: state[4],
+        longitude: state[5],
+        latitude: state[6],
+        baro_altitude: state[7],
+        on_ground: state[8],
+        velocity: state[9],
+        true_track: state[10],
+        vertical_rate: state[11],
+        geo_altitude: state[13],
+    };
+}
 
-        const data = await fetchAllStates();
+// Map an adsb.fi / airplanes.live aircraft object to OpenSkyState
+// These APIs give altitude in feet and speed in knots — convert to OpenSky units (meters, m/s)
+function mapAdsbAcToState(ac: any, fallbackCallsign: string): OpenSkyState {
+    return {
+        icao24: ac.hex || '',
+        callsign: (ac.flight || fallbackCallsign).trim(),
+        origin_country: ac.ownOp || '',
+        time_position: ac.seen_pos != null ? Date.now() / 1000 - ac.seen_pos : null,
+        last_contact: Date.now() / 1000,
+        longitude: ac.lon ?? null,
+        latitude: ac.lat ?? null,
+        baro_altitude: ac.alt_baro != null && ac.alt_baro !== 'ground'
+            ? Number(ac.alt_baro) * 0.3048   // ft → meters
+            : null,
+        on_ground: ac.alt_baro === 'ground' || ac.alt_baro === 0,
+        velocity: ac.gs != null ? ac.gs * 0.514444 : null,           // knots → m/s
+        true_track: ac.track ?? null,
+        vertical_rate: ac.baro_rate != null ? ac.baro_rate * 0.00508 : null, // ft/min → m/s
+        geo_altitude: ac.alt_geom != null ? ac.alt_geom * 0.3048 : null,
+    };
+}
 
-        if (!data.states || data.states.length === 0) {
-            console.log('No flights found in OpenSky data');
-            return null;
-        }
+// Search an OpenSky states snapshot for a specific flight callsign
+function searchOpenSkyStates(data: OpenSkyResponse, flightNumber: string): any[] | undefined {
+    if (!data.states || data.states.length === 0) return undefined;
 
-        // Normalize input
-        const normalizedInput = flightNumber.toUpperCase().trim().replace(/\s/g, '');
-        const parsed = parseFlightNumber(normalizedInput);
-        let flightState: any[] | undefined;
+    const normalizedInput = flightNumber.toUpperCase().trim().replace(/\s/g, '');
+    const parsed = parseFlightNumber(normalizedInput);
 
-        // First try exact match with raw input (handles ICAO callsigns like ACA794)
-        flightState = data.states.find(state => {
-            const cs = state[1]?.toString().trim().toUpperCase().replace(/\s/g, '') || '';
-            return cs === normalizedInput;
-        });
+    // 1. Exact callsign match
+    let match = data.states.find(state => {
+        const cs = state[1]?.toString().trim().toUpperCase().replace(/\s/g, '') || '';
+        return cs === normalizedInput;
+    });
 
-        // Try matching with ICAO code + flight number (OpenSky uses ICAO callsigns)
-        if (!flightState && parsed) {
-            const { carrierCode, icaoCode, flightNum } = parsed;
-
-            // If user entered ICAO code, try it directly; also try IATA code
-            const codesToTry = icaoCode ? [icaoCode, carrierCode] : [carrierCode];
-
-            for (const code of codesToTry) {
-                if (flightState) break;
-                flightState = data.states.find(state => {
-                    const cs = state[1]?.toString().trim().toUpperCase().replace(/\s/g, '') || '';
-                    return cs.startsWith(code) && cs.endsWith(flightNum);
-                });
-            }
-        }
-
-        // Fallback to looser heuristic if not found
-        if (!flightState && parsed) {
-            const { flightNum } = parsed;
-            flightState = data.states.find((state) => {
-                const callsign = state[1]?.toString().trim().toUpperCase().replace(/\s/g, '') || '';
-                // Loose match: contains flight number
-                if (callsign.includes(flightNum) && callsign.length > flightNum.length) {
-                    return true;
-                }
-                return false;
+    // 2. ICAO/IATA carrier code + flight number
+    if (!match && parsed) {
+        const { carrierCode, icaoCode, flightNum } = parsed;
+        const codesToTry = icaoCode ? [icaoCode, carrierCode] : [carrierCode];
+        for (const code of codesToTry) {
+            if (match) break;
+            match = data.states.find(state => {
+                const cs = state[1]?.toString().trim().toUpperCase().replace(/\s/g, '') || '';
+                return cs.startsWith(code) && cs.endsWith(flightNum);
             });
         }
+    }
 
-        if (!flightState) {
-            console.log(`❌ Flight ${flightNumber} not found in OpenSky data`);
-            return null;
-        }
+    // 3. Loose: callsign contains the flight number
+    if (!match && parsed) {
+        const { flightNum } = parsed;
+        match = data.states.find(state => {
+            const cs = state[1]?.toString().trim().toUpperCase().replace(/\s/g, '') || '';
+            return cs.includes(flightNum) && cs.length > flightNum.length;
+        });
+    }
 
-        console.log('✅ Found flight in OpenSky!');
+    return match;
+}
 
-        // Parse the state array into our interface
-        return {
-            icao24: flightState[0],
-            callsign: flightState[1],
-            origin_country: flightState[2],
-            time_position: flightState[3],
-            last_contact: flightState[4],
-            longitude: flightState[5],
-            latitude: flightState[6],
-            baro_altitude: flightState[7],
-            on_ground: flightState[8],
-            velocity: flightState[9],
-            true_track: flightState[10],
-            vertical_rate: flightState[11],
-            geo_altitude: flightState[13],
-        };
-    } catch (error) {
-        console.error('OpenSky API error:', error);
+// ─── Source 1: OpenSky Network ────────────────────────────────────────────────
+async function getFlightFromOpenSkyDirect(flightNumber: string): Promise<OpenSkyState | null> {
+    const data = await fetchAllStates(); // may throw on 429
+    const state = searchOpenSkyStates(data, flightNumber);
+    if (!state) return null;
+    console.log('✅ [OpenSky] found:', flightNumber);
+    return mapStateArray(state);
+}
+
+// ─── Source 2: adsb.fi (free, no auth) ───────────────────────────────────────
+async function getFlightFromAdsbFi(flightNumber: string): Promise<OpenSkyState | null> {
+    try {
+        const callsign = flightNumber.toUpperCase().trim().replace(/\s/g, '');
+        const response = await fetch(
+            `https://opendata.adsb.fi/api/v2/callsign/${callsign}`,
+            { headers: { Accept: 'application/json' } }
+        );
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (!data.ac || data.ac.length === 0) return null;
+        console.log('✅ [adsb.fi] found:', flightNumber);
+        return mapAdsbAcToState(data.ac[0], flightNumber);
+    } catch {
         return null;
     }
+}
+
+// ─── Source 3: airplanes.live (free, no auth) ─────────────────────────────────
+async function getFlightFromAirplanesLive(flightNumber: string): Promise<OpenSkyState | null> {
+    try {
+        const callsign = flightNumber.toUpperCase().trim().replace(/\s/g, '');
+        const response = await fetch(`https://api.airplanes.live/v2/callsign/${callsign}`);
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (!data.ac || data.ac.length === 0) return null;
+        console.log('✅ [airplanes.live] found:', flightNumber);
+        return mapAdsbAcToState(data.ac[0], flightNumber);
+    } catch {
+        return null;
+    }
+}
+
+// ─── Public: position waterfall ───────────────────────────────────────────────
+// Tries each source in order; returns first successful result.
+export async function getFlightFromOpenSky(flightNumber: string): Promise<OpenSkyState | null> {
+    // 1. OpenSky Network
+    try {
+        console.log('🛰️  [1/3] OpenSky Network for:', flightNumber);
+        const result = await getFlightFromOpenSkyDirect(flightNumber);
+        if (result) return result;
+        console.log('   ↳ not in OpenSky snapshot, trying adsb.fi...');
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`   ↳ OpenSky failed (${msg}), trying adsb.fi...`);
+    }
+
+    // 2. adsb.fi
+    console.log('📡 [2/3] adsb.fi for:', flightNumber);
+    const adsbResult = await getFlightFromAdsbFi(flightNumber);
+    if (adsbResult) return adsbResult;
+    console.log('   ↳ not in adsb.fi, trying airplanes.live...');
+
+    // 3. airplanes.live
+    console.log('✈️  [3/3] airplanes.live for:', flightNumber);
+    const alResult = await getFlightFromAirplanesLive(flightNumber);
+    if (alResult) return alResult;
+
+    console.log('❌ Live position not found in any source for:', flightNumber);
+    return null;
 }
 
 // Fetch departure/arrival ICAO airport codes for an aircraft using OpenSky flights endpoint
@@ -171,23 +240,7 @@ export async function getFlightByICAO24(icao24: string): Promise<OpenSkyState | 
             return null;
         }
 
-        const state = data.states[0];
-
-        return {
-            icao24: state[0],
-            callsign: state[1],
-            origin_country: state[2],
-            time_position: state[3],
-            last_contact: state[4],
-            longitude: state[5],
-            latitude: state[6],
-            baro_altitude: state[7],
-            on_ground: state[8],
-            velocity: state[9],
-            true_track: state[10],
-            vertical_rate: state[11],
-            geo_altitude: state[13],
-        };
+        return mapStateArray(data.states[0]);
     } catch (error) {
         console.error('OpenSky API error:', error);
         return null;
