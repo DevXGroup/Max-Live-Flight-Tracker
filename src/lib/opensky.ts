@@ -118,6 +118,32 @@ export async function getFlightFromOpenSky(flightNumber: string): Promise<OpenSk
     }
 }
 
+// Fetch departure/arrival ICAO airport codes for an aircraft using OpenSky flights endpoint
+export async function getFlightRouteFromOpenSky(
+    icao24: string
+): Promise<{ departureIcao: string | null; arrivalIcao: string | null } | null> {
+    try {
+        const now = Math.floor(Date.now() / 1000);
+        const begin = now - 86400; // look back 24 hours
+        const url = `https://opensky-network.org/api/flights/aircraft?icao24=${icao24.toLowerCase()}&begin=${begin}&end=${now}`;
+
+        const response = await fetch(url);
+        if (!response.ok) return null;
+
+        const data = await response.json();
+        if (!Array.isArray(data) || data.length === 0) return null;
+
+        // Pick the flight with the most recent lastSeen
+        const recent = data.sort((a: any, b: any) => b.lastSeen - a.lastSeen)[0];
+        return {
+            departureIcao: recent.estDepartureAirport || null,
+            arrivalIcao: recent.estArrivalAirport || null,
+        };
+    } catch {
+        return null;
+    }
+}
+
 // Get flight by ICAO24 code (more reliable if you know the aircraft code)
 export async function getFlightByICAO24(icao24: string): Promise<OpenSkyState | null> {
     try {
