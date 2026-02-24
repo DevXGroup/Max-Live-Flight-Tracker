@@ -67,6 +67,37 @@ export const AIRPORT_COORDS: Record<string, { lat: number; lng: number; name: st
     'MNL': { lat: 14.5086, lng: 121.0194, name: 'Manila Ninoy Aquino' },
     'CGK': { lat: -6.1256, lng: 106.6559, name: 'Jakarta Soekarno-Hatta' },
     'CEB': { lat: 10.3075, lng: 123.9790, name: 'Mactan-Cebu International' },
+
+    // Canadian Airports
+    'YYZ': { lat: 43.6772, lng: -79.6306, name: 'Toronto Pearson International' },
+    'YVR': { lat: 49.1967, lng: -123.1815, name: 'Vancouver International' },
+    'YUL': { lat: 45.4706, lng: -73.7408, name: 'Montréal-Trudeau International' },
+    'YYC': { lat: 51.1215, lng: -114.0131, name: 'Calgary International' },
+    'YEG': { lat: 53.3097, lng: -113.5800, name: 'Edmonton International' },
+    'YOW': { lat: 45.3225, lng: -75.6692, name: 'Ottawa Macdonald-Cartier International' },
+    'YHZ': { lat: 44.8808, lng: -63.5086, name: 'Halifax Stanfield International' },
+    'YWG': { lat: 49.9100, lng: -97.2398, name: 'Winnipeg Richardson International' },
+    'YQB': { lat: 46.7911, lng: -71.3933, name: 'Québec City Jean Lesage International' },
+    'YXE': { lat: 52.1708, lng: -106.6997, name: 'Saskatoon John G. Diefenbaker International' },
+
+    // Additional US Airports
+    'DEN': { lat: 39.8561, lng: -104.6737, name: 'Denver International' },
+    'MSP': { lat: 44.8848, lng: -93.2223, name: 'Minneapolis-Saint Paul International' },
+    'DTW': { lat: 42.2162, lng: -83.3554, name: 'Detroit Metropolitan Wayne County' },
+    'PHL': { lat: 39.8721, lng: -75.2411, name: 'Philadelphia International' },
+    'CLT': { lat: 35.2140, lng: -80.9431, name: 'Charlotte Douglas International' },
+    'IAH': { lat: 29.9902, lng: -95.3368, name: 'Houston George Bush Intercontinental' },
+    'PHX': { lat: 33.4373, lng: -112.0078, name: 'Phoenix Sky Harbor International' },
+    'MCO': { lat: 28.4294, lng: -81.3089, name: 'Orlando International' },
+    'SAN': { lat: 32.7338, lng: -117.1933, name: 'San Diego International' },
+    'BNA': { lat: 36.1245, lng: -86.6782, name: 'Nashville International' },
+    'AUS': { lat: 30.1975, lng: -97.6664, name: 'Austin-Bergstrom International' },
+    'PDX': { lat: 45.5898, lng: -122.5951, name: 'Portland International' },
+    'SLC': { lat: 40.7884, lng: -111.9778, name: 'Salt Lake City International' },
+    'RDU': { lat: 35.8776, lng: -78.7875, name: 'Raleigh-Durham International' },
+    'BWI': { lat: 39.1754, lng: -76.6682, name: 'Baltimore/Washington International' },
+    'IAD': { lat: 38.9531, lng: -77.4565, name: 'Washington Dulles International' },
+    'DCA': { lat: 38.8521, lng: -77.0379, name: 'Ronald Reagan Washington National' },
 };
 
 // Calculate great circle distance between two points (in km)
@@ -135,4 +166,41 @@ function toDeg(radians: number): number {
 // Get airport coordinates by IATA code
 export function getAirportCoords(iataCode: string): { lat: number; lng: number; name: string } | null {
     return AIRPORT_COORDS[iataCode] || null;
+}
+
+// ICAO4 airport codes that don't follow simple prefix rules → IATA
+const ICAO4_TO_IATA: Record<string, string> = {
+    'EGLL': 'LHR', 'EGKK': 'LGW', 'EHAM': 'AMS', 'EDDF': 'FRA',
+    'LFPG': 'CDG', 'LEMD': 'MAD', 'LIRF': 'FCO', 'LTFM': 'IST',
+    'LSZH': 'ZRH', 'OMDB': 'DXB', 'OMAL': 'AUH', 'OTHH': 'DOH',
+    'OTBD': 'DOH', 'RJTT': 'HND', 'RJAA': 'NRT', 'RKSI': 'ICN',
+    'ZBAA': 'PEK', 'ZSPD': 'PVG', 'VHHH': 'HKG', 'WSSS': 'SIN',
+    'VTBS': 'BKK', 'WMKK': 'KUL', 'FAOR': 'JNB', 'HECA': 'CAI',
+    'SAEZ': 'EZE', 'SBGR': 'GRU', 'SBGL': 'GIG', 'SKBO': 'BOG',
+    'SPJC': 'LIM', 'YSSY': 'SYD', 'YMML': 'MEL', 'NZAA': 'AKL',
+    'VIDP': 'DEL', 'VABB': 'BOM', 'RPLL': 'MNL', 'WIII': 'CGK',
+};
+
+// Convert a 4-letter ICAO airport code to a 3-letter IATA code
+export function icaoToIata(icao4: string): string | null {
+    if (!icao4 || icao4.length !== 4) return null;
+    const upper = icao4.toUpperCase();
+
+    // Check explicit lookup table first
+    if (ICAO4_TO_IATA[upper]) return ICAO4_TO_IATA[upper];
+
+    // US airports: K + 3-letter IATA (e.g. KLAX → LAX)
+    if (upper.startsWith('K')) return upper.slice(1);
+
+    // Canadian airports: CY + 2 chars → Y + 2 chars (e.g. CYYZ → YYZ, CYVR → YVR)
+    if (upper.startsWith('C') && upper[1] === 'Y') return upper.slice(1);
+
+    // Mexican airports: MM prefix (e.g. MMMX → MEX) — fall through to null
+    // Australian airports: YY prefix handled via explicit table above
+
+    // Generic fallback: try last 3 chars and see if it's in our DB
+    const last3 = upper.slice(1);
+    if (AIRPORT_COORDS[last3]) return last3;
+
+    return null;
 }
