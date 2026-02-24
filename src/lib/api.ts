@@ -253,38 +253,37 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
 
     try {
         const { getFlightFromOpenSky } = await import('./opensky');
-        const { getFlightStatusFromAmadeus, parseFlightNumber, getAirportName } = await import('./amadeus');
+        const { getFlightStatusFromAmadeus, parseFlightNumber, getAirportName, hasAmadeusCredentials } = await import('./amadeus');
         const { getAirportCoords, calculateDistance } = await import('./airports');
         const { getAirlineName } = await import('./utils');
 
-        // 1. Try to get Schedule from Amadeus (Today & Tomorrow)
+        // 1. Try to get Schedule from Amadeus (Today, Tomorrow, Yesterday)
         let amadeusData = null;
         const parsed = parseFlightNumber(flightNumber);
         const now = new Date();
         const today = now.toISOString().split('T')[0];
 
-        // Calculate tomorrow
-        const tomorrowDate = new Date(now);
-        tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-        const tomorrow = tomorrowDate.toISOString().split('T')[0];
+        if (!hasAmadeusCredentials) {
+            console.log('⚠️ Amadeus credentials not configured, skipping schedule lookup');
+        } else if (parsed) {
+            // Calculate tomorrow
+            const tomorrowDate = new Date(now);
+            tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+            const tomorrow = tomorrowDate.toISOString().split('T')[0];
 
-        // Calculate yesterday
-        const yesterdayDate = new Date(now);
-        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-        const yesterday = yesterdayDate.toISOString().split('T')[0];
+            // Calculate yesterday
+            const yesterdayDate = new Date(now);
+            yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+            const yesterday = yesterdayDate.toISOString().split('T')[0];
 
-        if (parsed) {
             console.log(`📅 Checking schedule for ${parsed.carrierCode}${parsed.flightNum}...`);
-            // Try Today
             amadeusData = await getFlightStatusFromAmadeus(parsed.carrierCode, parsed.flightNum, today);
 
-            // If not found, Try Tomorrow
             if (!amadeusData) {
                 console.log(`📅 Not found for today, checking tomorrow (${tomorrow})...`);
                 amadeusData = await getFlightStatusFromAmadeus(parsed.carrierCode, parsed.flightNum, tomorrow);
             }
 
-            // If still not found, Try Yesterday (for late night flights or delayed flights)
             if (!amadeusData) {
                 console.log(`📅 Not found for tomorrow, checking yesterday (${yesterday})...`);
                 amadeusData = await getFlightStatusFromAmadeus(parsed.carrierCode, parsed.flightNum, yesterday);

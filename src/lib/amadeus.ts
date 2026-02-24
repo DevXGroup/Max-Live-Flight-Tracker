@@ -4,6 +4,8 @@
 const AMADEUS_API_KEY = process.env.NEXT_PUBLIC_AMADEUS_API_KEY || '';
 const AMADEUS_API_SECRET = process.env.NEXT_PUBLIC_AMADEUS_API_SECRET || '';
 
+export const hasAmadeusCredentials = !!(AMADEUS_API_KEY && AMADEUS_API_SECRET);
+
 interface AmadeusTokenResponse {
     access_token: string;
     expires_in: number;
