@@ -203,7 +203,12 @@ export async function getFlightData(flightNumber: string): Promise<FlightStatus 
         try {
             const response = await fetch(`/api/flight?flightNumber=${flightNumber.trim()}`);
             if (!response.ok) return null;
-            return response.json();
+            const data = await response.json();
+            // If the API returned a 200 but with an "error" or "notFound" field
+            if (data && (data.error || data.notFound)) {
+                return null;
+            }
+            return data;
         } catch (error) {
             console.error('Error fetching from local API proxy:', error);
             return null;
@@ -211,7 +216,14 @@ export async function getFlightData(flightNumber: string): Promise<FlightStatus 
     }
 
     console.log('🔍 Searching for flight:', flightNumber);
-    console.log('🔑 API Key present:', !!AVIATION_STACK_KEY);
+
+    // Check mock data first (good for testing)
+    const normalizedId = flightNumber.trim().toUpperCase().replace(/\s/g, '');
+    if (MOCK_FLIGHTS[normalizedId]) {
+        console.log('🎯 [Mock] Found flight in mock data:', normalizedId);
+        return MOCK_FLIGHTS[normalizedId];
+    }
+
     console.log('📡 Data source:', DATA_SOURCE);
 
     // Route to appropriate data source

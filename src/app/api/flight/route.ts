@@ -14,7 +14,12 @@ export async function GET(request: NextRequest) {
         const data = await getFlightData(flightNumber);
 
         if (!data) {
-            return NextResponse.json({ error: 'Flight not found' }, { status: 404 });
+            // Return 200 with an error object instead of 404 to avoid scary red console errors
+            // The client will handle the null data/error message
+            return NextResponse.json({
+                error: 'Flight not found or currently inactive',
+                notFound: true
+            }, { status: 200 });
         }
 
         return NextResponse.json(data);
