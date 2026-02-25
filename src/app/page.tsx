@@ -33,20 +33,18 @@ export default function Home() {
     setFlightData(null);
 
     try {
-      console.log('⏳ Calling getFlightData...');
+      console.log(`⏳ [Home] Searching for ${flightNumber}...`);
       const data = await getFlightData(flightNumber);
-      console.log('📦 Received data:', data);
+      console.log('📦 [Home] Received response:', data ? 'Valid Data' : 'Not Found');
 
       if (data) {
-        console.log('✅ Setting flight data');
         setFlightData(data);
         setLastUpdate(new Date());
       } else {
-        console.log('❌ No data received');
         setError('Flight not found. Try "AA123", "BA249", or "LH400".');
       }
     } catch (err) {
-      console.error('💥 Error in handleSearch:', err);
+      console.error('💥 [Home] Error in handleSearch:', err);
       const errorMessage = err instanceof Error ? err.message : 'An error occurred while fetching flight data.';
       setError(errorMessage);
     } finally {

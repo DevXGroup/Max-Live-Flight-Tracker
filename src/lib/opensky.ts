@@ -39,16 +39,22 @@ async function fetchAllStates(): Promise<OpenSkyResponse> {
         return statesCache.data;
     }
 
-    const response = await fetch('https://opensky-network.org/api/states/all');
+    console.log('📡 [OpenSky] Fetching active aircraft states from states/all...');
+    const response = await fetch('https://opensky-network.org/api/states/all', {
+        next: { revalidate: 0 },
+        cache: 'no-store'
+    } as any);
 
     if (!response.ok) {
         if (response.status === 429) {
+            console.error('❌ [OpenSky] Rate limit exceeded');
             throw new Error('OpenSky rate limit exceeded.');
         }
         throw new Error(`OpenSky API error: ${response.status}`);
     }
 
     const data: OpenSkyResponse = await response.json();
+    console.log(`✅ [OpenSky] Successfully fetched ${data.states?.length || 0} aircraft states`);
     statesCache = { data, timestamp: now };
     return data;
 }
@@ -105,15 +111,21 @@ function searchOpenSkyStates(data: OpenSkyResponse, flightNumber: string): OpenS
     const parsed = parseFlightNumber(normalizedInput);
 
     // 1. Exact callsign match
+    console.log(`🔍 [OpenSky] Searching states for callsign: ${normalizedInput}`);
     let match = data.states.find(state => {
         const cs = state[1]?.toString().trim().toUpperCase().replace(/\s/g, '') || '';
         return cs === normalizedInput;
     });
 
+    if (match) {
+        console.log(`✅ [OpenSky] Found exact callsign match: ${match[1]}`);
+    }
+
     // 2. ICAO/IATA carrier code + flight number
     if (!match && parsed) {
         const { carrierCode, icaoCode, flightNum } = parsed;
         const codesToTry = icaoCode ? [icaoCode, carrierCode] : [carrierCode];
+        console.log(`🔍 [OpenSky] No exact match, trying carrier codes: ${codesToTry.join(', ')} + ${flightNum}`);
         for (const code of codesToTry) {
             if (match) break;
             match = data.states.find(state => {
@@ -123,13 +135,22 @@ function searchOpenSkyStates(data: OpenSkyResponse, flightNumber: string): OpenS
         }
     }
 
+    if (match && !match[1]?.toString().includes(normalizedInput)) {
+        console.log(`✅ [OpenSky] Found fuzzy match: ${match[1]}`);
+    }
+
     // 3. Loose: callsign contains the flight number
     if (!match && parsed) {
         const { flightNum } = parsed;
+        console.log(`🔍 [OpenSky] No carrier match, trying loose flight number match: ${flightNum}`);
         match = data.states.find(state => {
             const cs = state[1]?.toString().trim().toUpperCase().replace(/\s/g, '') || '';
             return cs.includes(flightNum) && cs.length > flightNum.length;
         });
+    }
+
+    if (!match) {
+        console.log('❌ [OpenSky] No matching callsign found in active states');
     }
 
     return match;

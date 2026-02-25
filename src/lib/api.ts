@@ -198,24 +198,40 @@ function calculateRemainingTime(arrivalTime: string): string {
 }
 
 export async function getFlightData(flightNumber: string): Promise<FlightStatus | null> {
+    const trimmedFlightNumber = flightNumber.trim().toUpperCase();
+
     // If running in the browser, delegate to our local API route to avoid CORS and hide keys
     if (typeof window !== 'undefined') {
         try {
-            const response = await fetch(`/api/flight?flightNumber=${flightNumber.trim()}`);
-            if (!response.ok) return null;
-            const data = await response.json();
-            // If the API returned a 200 but with an "error" or "notFound" field
-            if (data && (data.error || data.notFound)) {
-                return null;
+            console.log(`🌐 [Client] Fetching flight data for ${trimmedFlightNumber}...`);
+            const response = await fetch(`/api/flight?flightNumber=${trimmedFlightNumber}`);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `Server returned ${response.status}`);
             }
+
+            const data = await response.json();
+
+            // If the API returned a 200 but with an "error" or "notFound" field
+            if (data && data.error) {
+                console.warn(`⚠️ [Client] API returned error for ${trimmedFlightNumber}:`, data.error);
+                // If it's just a "not found", we return null to show the default message
+                // otherwise we might want to throw to show the specific error
+                if (data.notFound) return null;
+                throw new Error(data.error);
+            }
+
+            console.log(`✅ [Client] Received data for ${trimmedFlightNumber}`);
             return data;
         } catch (error) {
-            console.error('Error fetching from local API proxy:', error);
-            return null;
+            console.error(`💥 [Client] Error fetching flight ${trimmedFlightNumber}:`, error);
+            // Re-throw so the UI can catch it and show the error message
+            throw error;
         }
     }
 
-    console.log('🔍 Searching for flight:', flightNumber);
+    console.log('🔍 [Server] Searching for flight:', trimmedFlightNumber);
 
     // Check mock data first (good for testing)
     const normalizedId = flightNumber.trim().toUpperCase().replace(/\s/g, '');
@@ -279,29 +295,30 @@ async function getFlightDataHybrid(flightNumber: string): Promise<FlightStatus |
 async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightStatus | null> {
     console.log('🔍 Flight data chain starting for:', flightNumber);
 
+    const { getFlightFromOpenSky } = await import('./opensky');
+    const { getFlightStatusFromAmadeus, parseFlightNumber, getAirportName, hasAmadeusCredentials } = await import('./amadeus');
+    const { getAirportCoords, calculateDistance } = await import('./airports');
+    const { getAirlineName } = await import('./utils');
+
+    const parsed = parseFlightNumber(flightNumber);
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const tomorrowDate = new Date(now); tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const yesterdayDate = new Date(now); yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const tomorrow = tomorrowDate.toISOString().split('T')[0];
+    const yesterday = yesterdayDate.toISOString().split('T')[0];
+
+    // Helper: try Amadeus for today/tomorrow/yesterday given carrier+flightNum
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async function tryAmadeus(carrier: string, num: string): Promise<any | null> {
+        return (
+            await getFlightStatusFromAmadeus(carrier, num, today) ||
+            await getFlightStatusFromAmadeus(carrier, num, tomorrow) ||
+            await getFlightStatusFromAmadeus(carrier, num, yesterday)
+        ) ?? null;
+    }
+
     try {
-        const { getFlightFromOpenSky } = await import('./opensky');
-        const { getFlightStatusFromAmadeus, parseFlightNumber, getAirportName, hasAmadeusCredentials } = await import('./amadeus');
-        const { getAirportCoords, calculateDistance } = await import('./airports');
-        const { getAirlineName } = await import('./utils');
-
-        const parsed = parseFlightNumber(flightNumber);
-        const now = new Date();
-        const today = now.toISOString().split('T')[0];
-        const tomorrowDate = new Date(now); tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-        const yesterdayDate = new Date(now); yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-        const tomorrow = tomorrowDate.toISOString().split('T')[0];
-        const yesterday = yesterdayDate.toISOString().split('T')[0];
-
-        // Helper: try Amadeus for today/tomorrow/yesterday given carrier+flightNum
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        async function tryAmadeus(carrier: string, num: string): Promise<any | null> {
-            return (
-                await getFlightStatusFromAmadeus(carrier, num, today) ||
-                await getFlightStatusFromAmadeus(carrier, num, tomorrow) ||
-                await getFlightStatusFromAmadeus(carrier, num, yesterday)
-            ) ?? null;
-        }
 
         // ── SCHEDULE CHAIN ────────────────────────────────────────────────────
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -655,7 +672,7 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
             // [A3] AviationStack — try actual callsign first, then original query
             if (flightStatus.departure.code === '---' || flightStatus.arrival.code === '---') {
                 const actualCallsign = openSkyData.callsign?.trim().replace(/\s/g, '') || flightNumber;
-                const queriesToTry = [...new Set([actualCallsign, flightNumber])];
+                const queriesToTry = Array.from(new Set([actualCallsign, flightNumber]));
                 console.log(`📅 [A3] AviationStack airport lookup for: ${queriesToTry.join(', ')}`);
                 try {
                     let avData: FlightStatus | null = null;
@@ -742,9 +759,24 @@ async function getFlightDataFromAviationStack(flightNumber: string): Promise<Fli
         console.log('📡 Calling API:', url.replace(AVIATION_STACK_KEY, 'HIDDEN'));
 
         const response = await fetch(url);
+
+        if (!response.ok) {
+            console.error(`❌ AviationStack API error: ${response.status}`);
+            return MOCK_FLIGHTS[flightNumber.toUpperCase().replace(/\s/g, '')] || null;
+        }
+
         const data = await response.json();
 
-        console.log('📥 API Response:', data);
+        // Check for AviationStack API errors in the payload
+        if (data.error) {
+            console.error('❌ AviationStack API error details:', data.error);
+            if (data.error.code === 'rate_limit_reached' || data.error.code === 429) {
+                throw new Error('AviationStack API rate limit exceeded.');
+            }
+            return MOCK_FLIGHTS[flightNumber.toUpperCase().replace(/\s/g, '')] || null;
+        }
+
+        console.log('📥 AviationStack API Response:', !!data.data);
 
         if (!data.data || data.data.length === 0) {
             console.log('❌ No flight found in API, checking mock data...');

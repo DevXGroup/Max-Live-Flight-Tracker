@@ -131,7 +131,12 @@ export async function getFlightStatusFromAmadeus(
 
         if (!response.ok) {
             const errorBody = await response.text();
-            console.error(`Amadeus API error: ${response.status}`, errorBody);
+            console.error(`❌ Amadeus API error: ${response.status}`, errorBody);
+
+            if (response.status === 429) {
+                throw new Error('Amadeus API rate limit exceeded. Please try again in a few minutes.');
+            }
+
             return null;
         }
 
