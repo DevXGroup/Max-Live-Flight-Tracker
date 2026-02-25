@@ -41,7 +41,7 @@ export interface FlightStatus {
     };
 }
 
-const AVIATION_STACK_KEY = process.env.NEXT_PUBLIC_AVIATION_STACK_KEY;
+const AVIATION_STACK_KEY = process.env.AVIATION_STACK_KEY || process.env.NEXT_PUBLIC_AVIATION_STACK_KEY;
 
 // Data source configuration
 export type DataSource = 'aviationstack' | 'opensky' | 'hybrid';
@@ -198,6 +198,18 @@ function calculateRemainingTime(arrivalTime: string): string {
 }
 
 export async function getFlightData(flightNumber: string): Promise<FlightStatus | null> {
+    // If running in the browser, delegate to our local API route to avoid CORS and hide keys
+    if (typeof window !== 'undefined') {
+        try {
+            const response = await fetch(`/api/flight?flightNumber=${flightNumber.trim()}`);
+            if (!response.ok) return null;
+            return response.json();
+        } catch (error) {
+            console.error('Error fetching from local API proxy:', error);
+            return null;
+        }
+    }
+
     console.log('🔍 Searching for flight:', flightNumber);
     console.log('🔑 API Key present:', !!AVIATION_STACK_KEY);
     console.log('📡 Data source:', DATA_SOURCE);

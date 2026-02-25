@@ -1,8 +1,8 @@
 // Amadeus Flight Status API integration
 // Documentation: https://developers.amadeus.com/self-service/category/air/api-doc/on-demand-flight-status
 
-const AMADEUS_API_KEY = process.env.NEXT_PUBLIC_AMADEUS_API_KEY || '';
-const AMADEUS_API_SECRET = process.env.NEXT_PUBLIC_AMADEUS_API_SECRET || '';
+const AMADEUS_API_KEY = process.env.AMADEUS_API_KEY || process.env.NEXT_PUBLIC_AMADEUS_API_KEY || '';
+const AMADEUS_API_SECRET = process.env.AMADEUS_API_SECRET || process.env.NEXT_PUBLIC_AMADEUS_API_SECRET || '';
 
 export const hasAmadeusCredentials = !!(AMADEUS_API_KEY && AMADEUS_API_SECRET);
 
@@ -130,7 +130,8 @@ export async function getFlightStatusFromAmadeus(
         });
 
         if (!response.ok) {
-            console.error('Amadeus API error:', response.status);
+            const errorBody = await response.text();
+            console.error(`Amadeus API error: ${response.status}`, errorBody);
             return null;
         }
 
