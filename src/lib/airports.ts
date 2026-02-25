@@ -98,6 +98,89 @@ export const AIRPORT_COORDS: Record<string, { lat: number; lng: number; name: st
     'BWI': { lat: 39.1754, lng: -76.6682, name: 'Baltimore/Washington International' },
     'IAD': { lat: 38.9531, lng: -77.4565, name: 'Washington Dulles International' },
     'DCA': { lat: 38.8521, lng: -77.0379, name: 'Ronald Reagan Washington National' },
+
+    // Chinese Airports
+    'CAN': { lat: 23.3924, lng: 113.2988, name: 'Guangzhou Baiyun International' },
+    'CTU': { lat: 30.5728, lng: 103.9468, name: 'Chengdu Shuangliu International' },
+    'SZX': { lat: 22.6393, lng: 113.8107, name: 'Shenzhen Bao\'an International' },
+    'SHA': { lat: 31.1979, lng: 121.3363, name: 'Shanghai Hongqiao International' },
+    'KMG': { lat: 24.9924, lng: 102.7434, name: 'Kunming Changshui International' },
+    'XIY': { lat: 34.4471, lng: 108.7516, name: 'Xi\'an Xianyang International' },
+    'HGH': { lat: 30.2295, lng: 120.4344, name: 'Hangzhou Xiaoshan International' },
+    'WUH': { lat: 30.7838, lng: 114.2081, name: 'Wuhan Tianhe International' },
+    'CKG': { lat: 29.7192, lng: 106.6422, name: 'Chongqing Jiangbei International' },
+    'NKG': { lat: 31.7420, lng: 118.8620, name: 'Nanjing Lukou International' },
+    'TSN': { lat: 39.1244, lng: 117.3462, name: 'Tianjin Binhai International' },
+    'TAO': { lat: 36.2661, lng: 120.3744, name: 'Qingdao Jiaodong International' },
+    'SYX': { lat: 18.3029, lng: 109.4122, name: 'Sanya Phoenix International' },
+    'HAK': { lat: 19.9349, lng: 110.4590, name: 'Haikou Meilan International' },
+    'PKX': { lat: 39.5098, lng: 116.4105, name: 'Beijing Daxing International' },
+
+    // Additional Middle East
+    'RUH': { lat: 24.9576, lng: 46.6988, name: 'Riyadh King Khalid International' },
+    'JED': { lat: 21.6796, lng: 39.1565, name: 'Jeddah King Abdulaziz International' },
+    'MCT': { lat: 23.5933, lng: 58.2844, name: 'Muscat International' },
+    'BAH': { lat: 26.2708, lng: 50.6336, name: 'Bahrain International' },
+    'KWI': { lat: 29.2266, lng: 47.9689, name: 'Kuwait International' },
+    'AMM': { lat: 31.7226, lng: 35.9932, name: 'Amman Queen Alia International' },
+    'TLV': { lat: 32.0114, lng: 34.8867, name: 'Tel Aviv Ben Gurion International' },
+
+    // Additional Indian Airports
+    'MAA': { lat: 12.9941, lng: 80.1709, name: 'Chennai International' },
+    'BLR': { lat: 13.1979, lng: 77.7063, name: 'Bengaluru Kempegowda International' },
+    'HYD': { lat: 17.2403, lng: 78.4294, name: 'Hyderabad Rajiv Gandhi International' },
+    'CCU': { lat: 22.6547, lng: 88.4467, name: 'Kolkata Netaji Subhas Chandra Bose International' },
+    'COK': { lat: 10.1520, lng: 76.4019, name: 'Cochin International' },
+    'GOI': { lat: 15.3808, lng: 73.8314, name: 'Goa Manohar International' },
+
+    // Additional European Airports
+    'MUC': { lat: 48.3537, lng: 11.7750, name: 'Munich Airport' },
+    'BCN': { lat: 41.2971, lng: 2.0785, name: 'Barcelona-El Prat' },
+    'LGW': { lat: 51.1537, lng: -0.1821, name: 'London Gatwick' },
+    'STN': { lat: 51.8860, lng: 0.2389, name: 'London Stansted' },
+    'ORY': { lat: 48.7262, lng: 2.3652, name: 'Paris Orly' },
+    'VIE': { lat: 48.1103, lng: 16.5697, name: 'Vienna International' },
+    'OSL': { lat: 60.1976, lng: 11.1004, name: 'Oslo Gardermoen' },
+    'CPH': { lat: 55.6180, lng: 12.6560, name: 'Copenhagen Airport' },
+    'ARN': { lat: 59.6519, lng: 17.9186, name: 'Stockholm Arlanda' },
+    'HEL': { lat: 60.3172, lng: 24.9633, name: 'Helsinki-Vantaa' },
+    'DUB': { lat: 53.4213, lng: -6.2701, name: 'Dublin Airport' },
+    'LIS': { lat: 38.7742, lng: -9.1342, name: 'Lisbon Humberto Delgado' },
+    'ATH': { lat: 37.9364, lng: 23.9445, name: 'Athens Eleftherios Venizelos' },
+    'WAW': { lat: 52.1657, lng: 20.9671, name: 'Warsaw Chopin' },
+    'PRG': { lat: 50.1008, lng: 14.2600, name: 'Prague Václav Havel' },
+    'BRU': { lat: 50.9014, lng: 4.4844, name: 'Brussels Airport' },
+    'MXP': { lat: 45.6306, lng: 8.7281, name: 'Milan Malpensa' },
+
+    // Additional US Airports
+    'TPA': { lat: 27.9755, lng: -82.5332, name: 'Tampa International' },
+    'FLL': { lat: 26.0726, lng: -80.1527, name: 'Fort Lauderdale-Hollywood International' },
+    'STL': { lat: 38.7487, lng: -90.3700, name: 'St. Louis Lambert International' },
+    'SJC': { lat: 37.3626, lng: -121.9290, name: 'San Jose International' },
+    'OAK': { lat: 37.7213, lng: -122.2208, name: 'Oakland International' },
+    'MSY': { lat: 29.9934, lng: -90.2580, name: 'New Orleans Louis Armstrong International' },
+    'CLE': { lat: 41.4117, lng: -81.8498, name: 'Cleveland Hopkins International' },
+    'PIT': { lat: 40.4915, lng: -80.2329, name: 'Pittsburgh International' },
+    'IND': { lat: 39.7173, lng: -86.2944, name: 'Indianapolis International' },
+    'CMH': { lat: 39.9980, lng: -82.8919, name: 'John Glenn Columbus International' },
+    'MCI': { lat: 39.2976, lng: -94.7139, name: 'Kansas City International' },
+    'MKE': { lat: 42.9472, lng: -87.8966, name: 'Milwaukee Mitchell International' },
+    'HNL': { lat: 21.3187, lng: -157.9224, name: 'Daniel K. Inouye International (Honolulu)' },
+    'ANC': { lat: 61.1743, lng: -149.9962, name: 'Ted Stevens Anchorage International' },
+    'SMF': { lat: 38.6954, lng: -121.5908, name: 'Sacramento International' },
+
+    // Additional African Airports
+    'ADD': { lat: 8.9779, lng: 38.7993, name: 'Addis Ababa Bole International' },
+    'NBO': { lat: -1.3192, lng: 36.9278, name: 'Nairobi Jomo Kenyatta International' },
+    'LOS': { lat: 6.5774, lng: 3.3213, name: 'Lagos Murtala Muhammed International' },
+    'CMN': { lat: 33.3675, lng: -7.5898, name: 'Casablanca Mohammed V International' },
+    'CPT': { lat: -33.9648, lng: 18.6017, name: 'Cape Town International' },
+    'ALG': { lat: 36.6910, lng: 3.2154, name: 'Algiers Houari Boumediene' },
+    'TUN': { lat: 36.8510, lng: 10.2272, name: 'Tunis-Carthage International' },
+
+    // Additional Oceania
+    'BNE': { lat: -27.3842, lng: 153.1175, name: 'Brisbane Airport' },
+    'PER': { lat: -31.9403, lng: 115.9672, name: 'Perth Airport' },
 };
 
 // Calculate great circle distance between two points (in km)
@@ -170,15 +253,56 @@ export function getAirportCoords(iataCode: string): { lat: number; lng: number; 
 
 // ICAO4 airport codes that don't follow simple prefix rules → IATA
 const ICAO4_TO_IATA: Record<string, string> = {
-    'EGLL': 'LHR', 'EGKK': 'LGW', 'EHAM': 'AMS', 'EDDF': 'FRA',
-    'LFPG': 'CDG', 'LEMD': 'MAD', 'LIRF': 'FCO', 'LTFM': 'IST',
-    'LSZH': 'ZRH', 'OMDB': 'DXB', 'OMAL': 'AUH', 'OTHH': 'DOH',
-    'OTBD': 'DOH', 'RJTT': 'HND', 'RJAA': 'NRT', 'RKSI': 'ICN',
-    'ZBAA': 'PEK', 'ZSPD': 'PVG', 'VHHH': 'HKG', 'WSSS': 'SIN',
-    'VTBS': 'BKK', 'WMKK': 'KUL', 'FAOR': 'JNB', 'HECA': 'CAI',
+    // European airports
+    'EGLL': 'LHR', 'EGKK': 'LGW', 'EGSS': 'STN', 'EHAM': 'AMS',
+    'EDDF': 'FRA', 'EDDM': 'MUC', 'EDDB': 'BER', 'EDDL': 'DUS',
+    'LFPG': 'CDG', 'LFPO': 'ORY', 'LEMD': 'MAD', 'LEBL': 'BCN',
+    'LIRF': 'FCO', 'LIMC': 'MXP', 'LTFM': 'IST', 'LTAI': 'AYT',
+    'LSZH': 'ZRH', 'LOWW': 'VIE', 'ENGM': 'OSL', 'EKCH': 'CPH',
+    'ESSA': 'ARN', 'EFHK': 'HEL', 'EIDW': 'DUB', 'LPPT': 'LIS',
+    'LGAV': 'ATH', 'EPWA': 'WAW', 'LKPR': 'PRG', 'EBBR': 'BRU',
+
+    // Middle East airports
+    'OMDB': 'DXB', 'OMAL': 'AUH', 'OMAA': 'AUH',
+    'OTHH': 'DOH', 'OTBD': 'DOH',
+    'OERK': 'RUH', 'OEJN': 'JED',
+    'OOMS': 'MCT', 'OBKH': 'BAH', 'OKBK': 'KWI',
+    'OJAI': 'AMM', 'LLBG': 'TLV',
+
+    // East Asian airports
+    'RJTT': 'HND', 'RJAA': 'NRT', 'RJBB': 'KIX', 'RJOO': 'ITM',
+    'RJFF': 'FUK', 'RJCC': 'CTS', 'RJSS': 'SDJ', 'RJGG': 'NGO',
+    'RKSI': 'ICN', 'RKSS': 'GMP', 'RKPK': 'PUS',
+
+    // Chinese airports
+    'ZBAA': 'PEK', 'ZSPD': 'PVG', 'ZGGG': 'CAN', 'ZUUU': 'CTU',
+    'ZGSZ': 'SZX', 'ZSSS': 'SHA', 'ZPPP': 'KMG', 'ZLXY': 'XIY',
+    'ZSHC': 'HGH', 'ZHHH': 'WUH', 'ZUCK': 'CKG', 'ZSNJ': 'NKG',
+    'ZBTJ': 'TSN', 'ZSQD': 'TAO', 'ZJSY': 'SYX', 'ZJHK': 'HAK',
+    'ZBAD': 'PKX',
+
+    // Southeast Asian airports
+    'VHHH': 'HKG', 'WSSS': 'SIN', 'VTBS': 'BKK', 'WMKK': 'KUL',
+    'RPLL': 'MNL', 'WIII': 'CGK', 'RPVM': 'CEB',
+    'VTBD': 'DMK', 'VTSB': 'USM', 'VTSP': 'HKT',
+
+    // South Asian airports
+    'VIDP': 'DEL', 'VABB': 'BOM', 'VOMM': 'MAA', 'VOBL': 'BLR',
+    'VOHY': 'HYD', 'VECC': 'CCU', 'VOCI': 'COK', 'VOGO': 'GOI',
+    'VCBI': 'CMB', 'VRMM': 'MLE',
+
+    // African airports
+    'FAOR': 'JNB', 'FACT': 'CPT', 'HECA': 'CAI',
+    'HAAB': 'ADD', 'HKJK': 'NBO', 'DNMM': 'LOS',
+    'GMMN': 'CMN', 'DAAG': 'ALG', 'DTTA': 'TUN',
+
+    // South American airports
     'SAEZ': 'EZE', 'SBGR': 'GRU', 'SBGL': 'GIG', 'SKBO': 'BOG',
-    'SPJC': 'LIM', 'YSSY': 'SYD', 'YMML': 'MEL', 'NZAA': 'AKL',
-    'VIDP': 'DEL', 'VABB': 'BOM', 'RPLL': 'MNL', 'WIII': 'CGK',
+    'SPJC': 'LIM', 'SCEL': 'SCL',
+
+    // Oceania airports
+    'YSSY': 'SYD', 'YMML': 'MEL', 'YBBN': 'BNE', 'YPPH': 'PER',
+    'NZAA': 'AKL',
 };
 
 // Convert a 4-letter ICAO airport code to a 3-letter IATA code

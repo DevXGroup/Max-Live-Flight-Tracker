@@ -92,7 +92,7 @@ export default function FlightCard({ flight }: FlightCardProps) {
             <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-8 relative">
                 {/* Departure */}
                 <div className="flex-1 text-center md:text-left">
-                    <div className="text-5xl font-black text-white mb-1">{flight.departure.code}</div>
+                    <div className={`text-5xl font-black mb-1 ${flight.departure.code === '---' ? 'text-gray-600' : 'text-white'}`}>{flight.departure.code}</div>
                     <p className="text-sm text-gray-400 mb-2">{flight.departure.airport}</p>
                     <div className="text-lg text-blue-400 font-medium mb-1">
                         {flight.departure.actualTime ? format(new Date(flight.departure.actualTime), 'HH:mm') : format(new Date(flight.departure.scheduledTime), 'HH:mm')}
@@ -140,7 +140,7 @@ export default function FlightCard({ flight }: FlightCardProps) {
 
                 {/* Arrival */}
                 <div className="flex-1 text-center md:text-right">
-                    <div className="text-5xl font-black text-white mb-1">{flight.arrival.code}</div>
+                    <div className={`text-5xl font-black mb-1 ${flight.arrival.code === '---' ? 'text-gray-600' : 'text-white'}`}>{flight.arrival.code}</div>
                     <p className="text-sm text-gray-400 mb-2">{flight.arrival.airport}</p>
                     <div className={`text-lg font-medium mb-1 ${isDelayed ? 'text-red-400' : 'text-emerald-400'}`}>
                         {format(new Date(flight.arrival.estimatedTime), 'HH:mm')}

@@ -120,26 +120,26 @@ export default function FlightMap({ flight, onRefresh }: FlightMapProps) {
                             }}
                         />
 
-                        {/* Traveled path (dotted, from origin to plane) */}
+                        {/* Traveled path (animated dash, from origin to plane) */}
                         <Polyline
                             positions={[originPos, planePos]}
-                            pathOptions={{
-                                color: '#94a3b8',
-                                weight: 2,
-                                dashArray: '5, 10',
-                                opacity: 0.6,
-                            }}
-                        />
-
-                        {/* Future path (solid blue, from plane to destination) */}
-                        <Polyline
-                            positions={[planePos, destPos]}
                             pathOptions={{
                                 color: '#3b82f6',
                                 weight: 4,
                                 opacity: 0.8,
                                 lineCap: 'round',
                                 className: 'animate-dash'
+                            }}
+                        />
+
+                        {/* Future path (dotted, from destination to plane) */}
+                        <Polyline
+                            positions={[destPos, planePos]}
+                            pathOptions={{
+                                color: '#94a3b8',
+                                weight: 2,
+                                dashArray: '5, 10',
+                                opacity: 0.6,
                             }}
                         />
                     </>
@@ -201,11 +201,11 @@ export default function FlightMap({ flight, onRefresh }: FlightMapProps) {
             <div className="absolute bottom-4 right-4 z-[400] bg-white/90 backdrop-blur px-3 py-2 rounded-lg border border-slate-300 shadow-lg">
                 <div className="flex items-center gap-3 text-xs">
                     <div className="flex items-center gap-1">
-                        <div className="w-8 h-0.5 border-t-2 border-dashed border-slate-400"></div>
+                        <div className="w-8 h-0 border-t-2 border-dashed border-blue-500"></div>
                         <span className="text-slate-600">Traveled</span>
                     </div>
                     <div className="flex items-center gap-1">
-                        <div className="w-8 h-0.5 bg-blue-500"></div>
+                        <div className="w-8 h-0 border-t-2 border-dashed border-slate-400"></div>
                         <span className="text-slate-600">Remaining</span>
                     </div>
                 </div>
@@ -215,11 +215,12 @@ export default function FlightMap({ flight, onRefresh }: FlightMapProps) {
             <style jsx global>{`
                 @keyframes dash {
                     to {
-                        stroke-dashoffset: -50;
+                        stroke-dashoffset: -40;
                     }
                 }
                 .animate-dash {
-                    animation: dash 20s linear infinite;
+                    stroke-dasharray: 10, 10;
+                    animation: dash 3s linear infinite;
                 }
                 
                 /* Style zoom control buttons to be blue */

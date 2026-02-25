@@ -17,11 +17,15 @@ export interface OpenSkyState {
     true_track: number | null;
     vertical_rate: number | null;
     geo_altitude: number | null;
+    registration?: string | null;
+    aircraftType?: string | null;
 }
+
+export type OpenSkyStateValue = string | number | boolean | null;
 
 export interface OpenSkyResponse {
     time: number;
-    states: any[][] | null;
+    states: OpenSkyStateValue[][] | null;
 }
 
 // In-memory cache for the states/all response (30 second TTL)
@@ -50,26 +54,27 @@ async function fetchAllStates(): Promise<OpenSkyResponse> {
 }
 
 // Map a raw OpenSky state array to OpenSkyState
-function mapStateArray(state: any[]): OpenSkyState {
+function mapStateArray(state: OpenSkyStateValue[]): OpenSkyState {
     return {
-        icao24: state[0],
-        callsign: state[1],
-        origin_country: state[2],
-        time_position: state[3],
-        last_contact: state[4],
-        longitude: state[5],
-        latitude: state[6],
-        baro_altitude: state[7],
-        on_ground: state[8],
-        velocity: state[9],
-        true_track: state[10],
-        vertical_rate: state[11],
-        geo_altitude: state[13],
+        icao24: state[0] as string,
+        callsign: state[1] as string | null,
+        origin_country: state[2] as string,
+        time_position: state[3] as number | null,
+        last_contact: state[4] as number,
+        longitude: state[5] as number | null,
+        latitude: state[6] as number | null,
+        baro_altitude: state[7] as number | null,
+        on_ground: state[8] as boolean,
+        velocity: state[9] as number | null,
+        true_track: state[10] as number | null,
+        vertical_rate: state[11] as number | null,
+        geo_altitude: state[13] as number | null,
     };
 }
 
 // Map an adsb.fi / airplanes.live aircraft object to OpenSkyState
 // These APIs give altitude in feet and speed in knots — convert to OpenSky units (meters, m/s)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapAdsbAcToState(ac: any, fallbackCallsign: string): OpenSkyState {
     return {
         icao24: ac.hex || '',
@@ -87,11 +92,13 @@ function mapAdsbAcToState(ac: any, fallbackCallsign: string): OpenSkyState {
         true_track: ac.track ?? null,
         vertical_rate: ac.baro_rate != null ? ac.baro_rate * 0.00508 : null, // ft/min → m/s
         geo_altitude: ac.alt_geom != null ? ac.alt_geom * 0.3048 : null,
+        registration: ac.r || null,
+        aircraftType: ac.t || null,
     };
 }
 
 // Search an OpenSky states snapshot for a specific flight callsign
-function searchOpenSkyStates(data: OpenSkyResponse, flightNumber: string): any[] | undefined {
+function searchOpenSkyStates(data: OpenSkyResponse, flightNumber: string): OpenSkyStateValue[] | undefined {
     if (!data.states || data.states.length === 0) return undefined;
 
     const normalizedInput = flightNumber.toUpperCase().trim().replace(/\s/g, '');
@@ -215,6 +222,7 @@ export async function getFlightRouteFromOpenSky(
         if (!Array.isArray(data) || data.length === 0) return null;
 
         // Pick the flight with the most recent lastSeen
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const recent = data.sort((a: any, b: any) => b.lastSeen - a.lastSeen)[0];
         return {
             departureIcao: recent.estDepartureAirport || null,
@@ -243,6 +251,62 @@ export async function getFlightByICAO24(icao24: string): Promise<OpenSkyState | 
         return mapStateArray(data.states[0]);
     } catch (error) {
         console.error('OpenSky API error:', error);
+        return null;
+    }
+}
+
+// ─── hexdb.io route lookup ────────────────────────────────────────────────────
+// Resolves departure/arrival ICAO airport codes from a callsign via hexdb.io
+// Returns ICAO codes like "OTHH-EGLL" which can then be converted to IATA codes
+export async function getFlightRouteFromHexDB(
+    callsign: string
+): Promise<{ departureIcao: string | null; arrivalIcao: string | null } | null> {
+    try {
+        const cs = callsign.trim().toUpperCase().replace(/\s/g, '');
+        console.log('🔎 [hexdb.io] Route lookup for callsign:', cs);
+        const response = await fetch(`https://hexdb.io/api/v1/route/icao/${cs}`, {
+            signal: AbortSignal.timeout(5000), // 5s timeout
+        });
+        if (!response.ok) {
+            console.log('   ↳ hexdb.io returned', response.status);
+            return null;
+        }
+        // Response is JSON: {"flight": "QTR8940", "route": "OTHH-ZGGG", "updatetime": 1547555191}
+        const data = await response.json();
+        const route = data.route;
+        if (!route || !route.includes('-')) {
+            console.log('   ↳ hexdb.io returned no route or unexpected format:', JSON.stringify(data));
+            return null;
+        }
+        const parts = route.trim().split('-');
+        console.log('✅ [hexdb.io] Route resolved:', parts[0], '→', parts[1]);
+        return {
+            departureIcao: parts[0] || null,
+            arrivalIcao: parts[1] || null,
+        };
+    } catch (e) {
+        console.warn('[hexdb.io] Route lookup failed:', e);
+        return null;
+    }
+}
+
+// Fetch aircraft info from hexdb.io (registration, type, etc.)
+export async function getAircraftInfoFromHexDB(
+    icao24hex: string
+): Promise<{ registration: string | null; type: string | null; operator: string | null } | null> {
+    try {
+        const hex = icao24hex.trim().toLowerCase();
+        const response = await fetch(`https://hexdb.io/api/v1/aircraft/${hex}`, {
+            signal: AbortSignal.timeout(5000),
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        return {
+            registration: data.Registration || null,
+            type: data.Type || data.ICAOTypeCode || null,
+            operator: data.RegisteredOwners || null,
+        };
+    } catch {
         return null;
     }
 }

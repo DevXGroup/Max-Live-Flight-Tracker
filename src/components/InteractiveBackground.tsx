@@ -32,31 +32,32 @@ export default function InteractiveBackground() {
     const smoothX = useSpring(mouseX, { stiffness: 50, damping: 20 });
     const smoothY = useSpring(mouseY, { stiffness: 50, damping: 20 });
 
-    const dots = useRef<Point[]>([]);
+    const [dotsList, setDotsList] = useState<Point[]>([]);
     const [isMounted, setIsMounted] = useState(false);
 
     // Initialize dots
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsMounted(true);
-        if (dots.current.length === 0) {
-            // Initialize mouse to center to avoid initial jump
-            mouseX.set(window.innerWidth / 2);
-            mouseY.set(window.innerHeight / 2);
+        const newDots: Point[] = [];
+        // Initialize mouse to center to avoid initial jump
+        mouseX.set(window.innerWidth / 2);
+        mouseY.set(window.innerHeight / 2);
 
-            for (let i = 0; i < NUM_DOTS; i++) {
-                // Some dots form a plane, others are scattered
-                const isPlanePart = i < PLANE_POINTS.length;
-                const planePoint = PLANE_POINTS[i];
+        for (let i = 0; i < NUM_DOTS; i++) {
+            // Some dots form a plane, others are scattered
+            const isPlanePart = i < PLANE_POINTS.length;
+            const planePoint = PLANE_POINTS[i];
 
-                dots.current.push({
-                    x: isPlanePart ? planePoint.x : (Math.random() - 0.5) * window.innerWidth,
-                    y: isPlanePart ? planePoint.y : (Math.random() - 0.5) * window.innerHeight,
-                    originX: (Math.random() - 0.5) * window.innerWidth,
-                    originY: (Math.random() - 0.5) * window.innerHeight,
-                    color: isPlanePart ? '#3b82f6' : '#64748b', // Blue for plane, slate for others
-                });
-            }
+            newDots.push({
+                x: isPlanePart ? planePoint.x : (Math.random() - 0.5) * window.innerWidth,
+                y: isPlanePart ? planePoint.y : (Math.random() - 0.5) * window.innerHeight,
+                originX: (Math.random() - 0.5) * window.innerWidth,
+                originY: (Math.random() - 0.5) * window.innerHeight,
+                color: isPlanePart ? '#3b82f6' : '#64748b', // Blue for plane, slate for others
+            });
         }
+        setDotsList(newDots);
     }, []);
 
     useEffect(() => {
@@ -73,7 +74,7 @@ export default function InteractiveBackground() {
 
     return (
         <div ref={containerRef} className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-            {dots.current.map((dot, i) => (
+            {dotsList.map((dot, i) => (
                 <Dot
                     key={i}
                     dot={dot}
@@ -86,7 +87,9 @@ export default function InteractiveBackground() {
     );
 }
 
-function Dot({ dot, mouseX, mouseY, index }: { dot: Point, mouseX: any, mouseY: any, index: number }) {
+import { MotionValue } from 'framer-motion';
+
+function Dot({ dot, mouseX, mouseY, index }: { dot: Point, mouseX: MotionValue<number>, mouseY: MotionValue<number>, index: number }) {
     const ref = useRef<HTMLDivElement>(null);
 
     useAnimationFrame((t) => {

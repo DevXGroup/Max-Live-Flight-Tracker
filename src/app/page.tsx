@@ -97,9 +97,19 @@ export default function Home() {
             <div className="p-3 bg-blue-600 rounded-xl shadow-lg shadow-blue-600/20">
               <Plane className="text-white" size={32} />
             </div>
-            <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">
-              Live Flight Tracker
-            </h1>
+            <div className="flex flex-col">
+              <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">
+                Live Flight Tracker
+              </h1>
+              <a
+                href="https://devxgroup.io"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-blue-400/60 uppercase tracking-[0.3em] font-bold hover:text-blue-400 transition-colors ml-1"
+              >
+                By DevX Group LLC
+              </a>
+            </div>
           </div>
           <p className="text-slate-400 text-lg max-w-2xl text-center">
             Real-time global flight tracking with live maps and accurate status updates.
@@ -151,22 +161,33 @@ export default function Home() {
         {/* Branding Footer */}
         <footer className="mt-16 pb-8 text-center relative z-10">
           <div className="flex flex-col items-center gap-4">
-            <div className="flex items-center gap-3 text-slate-400 hover:text-slate-300 transition-colors group cursor-pointer">
+            <a
+              href="https://devxgroup.io"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 text-slate-400 hover:text-slate-200 transition-all duration-300 group cursor-pointer bg-slate-800/20 py-3 px-6 rounded-full border border-slate-700/50 hover:border-blue-500/50 hover:bg-slate-800/40"
+            >
               <img
                 src="/devx-logo.png"
                 alt="Devx Group LLC Logo"
-                className="h-8 w-auto object-contain brightness-90 group-hover:brightness-110 transition-all"
+                className="h-8 w-auto object-contain brightness-90 group-hover:brightness-110 group-hover:scale-105 transition-all"
               />
               <div className="text-left">
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Powered by</p>
-                <p className="font-bold text-slate-300">Devx Group LLC</p>
-                <p className="text-xs text-slate-500">Software Solutions</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-semibold">Brought to you by</p>
+                <p className="font-bold text-slate-300 group-hover:text-blue-400 transition-colors tracking-tight">Devx Group LLC</p>
+                <p className="text-[10px] text-slate-500">Premium Software Solutions</p>
               </div>
+            </a>
+            <div className="flex gap-6 mt-2">
+              <a href="https://devxgroup.io" className="text-xs text-slate-500 hover:text-blue-400 transition-colors">Our Website</a>
+              <a href="https://devxgroup.io/contact" className="text-xs text-slate-500 hover:text-blue-400 transition-colors">Contact Us</a>
+              <a href="https://devxgroup.io/services" className="text-xs text-slate-500 hover:text-blue-400 transition-colors">Services</a>
             </div>
-            <div className="h-px w-32 bg-gradient-to-r from-transparent via-slate-700 to-transparent"></div>
-            <p className="text-xs text-slate-600">© {new Date().getFullYear()} Devx Group LLC. All rights reserved.</p>
+            <div className="h-px w-32 bg-gradient-to-r from-transparent via-slate-800 to-transparent my-2"></div>
+            <p className="text-[10px] text-slate-600 uppercase tracking-widest">© {new Date().getFullYear()} Devx Group LLC. All rights reserved.</p>
           </div>
         </footer>
+
       </div>
     </main>
   );

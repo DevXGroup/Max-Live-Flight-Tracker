@@ -16,6 +16,7 @@ export default function GlobeMap({ flight }: GlobeMapProps) {
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setMounted(true);
 
         const updateDimensions = () => {
@@ -85,6 +86,13 @@ export default function GlobeMap({ flight }: GlobeMapProps) {
     }], [flight]);
 
     // Plane data for HTML marker
+    interface PlaneData {
+        lat: number;
+        lng: number;
+        heading: number;
+        color: string;
+    }
+
     const planeData = useMemo(() => [{
         lat: flight.liveData.latitude,
         lng: flight.liveData.longitude,
@@ -148,15 +156,16 @@ export default function GlobeMap({ flight }: GlobeMapProps) {
 
                 // Plane HTML Marker
                 htmlElementsData={planeData}
-                htmlElement={(d: any) => {
+                htmlElement={(d: object) => {
+                    const data = d as PlaneData;
                     const el = document.createElement('div');
                     // Better airplane icon - Material Design style
-                    el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width: 28px; height: 28px; color: ${d.color}; filter: drop-shadow(0 0 6px ${d.color});">
+                    el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width: 28px; height: 28px; color: ${data.color}; filter: drop-shadow(0 0 6px ${data.color});">
                         <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
                     </svg>`;
                     // Rotate based on heading (0 = North, 90 = East, etc.)
                     // The SVG naturally points up (North), so we just rotate by heading
-                    el.style.transform = `translate(-50%, -50%) rotate(${d.heading}deg)`;
+                    el.style.transform = `translate(-50%, -50%) rotate(${data.heading}deg)`;
                     el.style.width = '28px';
                     el.style.height = '28px';
                     el.style.pointerEvents = 'none';

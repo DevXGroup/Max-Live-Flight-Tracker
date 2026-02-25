@@ -47,6 +47,8 @@ const AVIATION_STACK_KEY = process.env.NEXT_PUBLIC_AVIATION_STACK_KEY;
 export type DataSource = 'aviationstack' | 'opensky' | 'hybrid';
 export const DATA_SOURCE: DataSource = 'opensky'; // Full chain: Amadeus → AviationStack (schedule) + OpenSky → adsb.fi → airplanes.live (position)
 
+// End of data source config section
+
 console.log('🔧 Flight data source:', DATA_SOURCE);
 
 // Keep mock data as fallback
@@ -210,7 +212,7 @@ export async function getFlightData(flightNumber: string): Promise<FlightStatus 
     }
 }
 
-import { getAirportCoords } from "./airports";
+// No-op - removed unused import
 
 
 // Hybrid mode: Use AviationStack for details + OpenSky for real-time position
@@ -240,7 +242,7 @@ async function getFlightDataHybrid(flightNumber: string): Promise<FlightStatus |
             aviationStackData.aircraft.speed = openSkyData.velocity ? Math.round(openSkyData.velocity * 1.94384) : aviationStackData.aircraft.speed; // m/s to knots
             aviationStackData.aircraft.heading = openSkyData.true_track || aviationStackData.aircraft.heading;
         }
-    } catch (error) {
+    } catch {
         console.warn('⚠️ Could not get OpenSky data, using AviationStack only');
     }
 
@@ -268,7 +270,8 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
         const yesterday = yesterdayDate.toISOString().split('T')[0];
 
         // Helper: try Amadeus for today/tomorrow/yesterday given carrier+flightNum
-        async function tryAmadeus(carrier: string, num: string): Promise<any> {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        async function tryAmadeus(carrier: string, num: string): Promise<any | null> {
             return (
                 await getFlightStatusFromAmadeus(carrier, num, today) ||
                 await getFlightStatusFromAmadeus(carrier, num, tomorrow) ||
@@ -277,6 +280,7 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
         }
 
         // ── SCHEDULE CHAIN ────────────────────────────────────────────────────
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let amadeusData: any = null;
 
         // [S1] Amadeus with searched flight number
@@ -529,8 +533,8 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
                     longitude: 0,
                 },
                 aircraft: {
-                    model: 'Unknown',
-                    registration: openSkyData.icao24.toUpperCase(),
+                    model: openSkyData.aircraftType || 'Unknown',
+                    registration: openSkyData.registration || openSkyData.icao24.toUpperCase(),
                     speed: openSkyData.velocity ? Math.round(openSkyData.velocity * 1.94384) : 0,
                     altitude: openSkyData.baro_altitude || openSkyData.geo_altitude || 0,
                     heading: openSkyData.true_track || 0,
@@ -544,30 +548,58 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
             };
 
             // ── AIRPORT RESOLUTION CHAIN ──────────────────────────────────────
-            // [A1] OpenSky historical flights endpoint (ICAO24-based)
+            // [A0] hexdb.io — free, no auth, callsign-based route lookup
             try {
-                const { getFlightRouteFromOpenSky } = await import('./opensky');
+                const { getFlightRouteFromHexDB } = await import('./opensky');
                 const { icaoToIata } = await import('./airports');
-                console.log('🗺️ [A1] OpenSky route lookup for ICAO24:', openSkyData.icao24);
-                const route = await getFlightRouteFromOpenSky(openSkyData.icao24);
-                if (route?.departureIcao) {
-                    const iata = icaoToIata(route.departureIcao);
+                const callsignForRoute = openSkyData.callsign?.trim().replace(/\s/g, '') || flightNumber;
+                console.log('🗺️ [A0] hexdb.io route lookup for callsign:', callsignForRoute);
+                const hexdbRoute = await getFlightRouteFromHexDB(callsignForRoute);
+                if (hexdbRoute?.departureIcao) {
+                    const iata = icaoToIata(hexdbRoute.departureIcao);
                     if (iata) {
                         flightStatus.departure.code = iata;
                         const coords = getAirportCoords(iata);
                         if (coords) { flightStatus.departure.airport = coords.name; flightStatus.departure.latitude = coords.lat; flightStatus.departure.longitude = coords.lng; }
                     }
                 }
-                if (route?.arrivalIcao) {
-                    const iata = icaoToIata(route.arrivalIcao);
+                if (hexdbRoute?.arrivalIcao) {
+                    const iata = icaoToIata(hexdbRoute.arrivalIcao);
                     if (iata) {
                         flightStatus.arrival.code = iata;
                         const coords = getAirportCoords(iata);
                         if (coords) { flightStatus.arrival.airport = coords.name; flightStatus.arrival.latitude = coords.lat; flightStatus.arrival.longitude = coords.lng; }
                     }
                 }
-                if (route?.departureIcao || route?.arrivalIcao) console.log('✅ [A1] Airports resolved via OpenSky route');
-            } catch (e) { console.warn('[A1] OpenSky route lookup failed:', e); }
+                if (hexdbRoute?.departureIcao || hexdbRoute?.arrivalIcao) console.log('✅ [A0] Airports resolved via hexdb.io');
+            } catch (e) { console.warn('[A0] hexdb.io route lookup failed:', e); }
+
+            // [A1] OpenSky historical flights endpoint (ICAO24-based)
+            if (flightStatus.departure.code === '---' || flightStatus.arrival.code === '---') {
+                try {
+                    const { getFlightRouteFromOpenSky } = await import('./opensky');
+                    const { icaoToIata } = await import('./airports');
+                    console.log('🗺️ [A1] OpenSky route lookup for ICAO24:', openSkyData.icao24);
+                    const route = await getFlightRouteFromOpenSky(openSkyData.icao24);
+                    if (route?.departureIcao && flightStatus.departure.code === '---') {
+                        const iata = icaoToIata(route.departureIcao);
+                        if (iata) {
+                            flightStatus.departure.code = iata;
+                            const coords = getAirportCoords(iata);
+                            if (coords) { flightStatus.departure.airport = coords.name; flightStatus.departure.latitude = coords.lat; flightStatus.departure.longitude = coords.lng; }
+                        }
+                    }
+                    if (route?.arrivalIcao && flightStatus.arrival.code === '---') {
+                        const iata = icaoToIata(route.arrivalIcao);
+                        if (iata) {
+                            flightStatus.arrival.code = iata;
+                            const coords = getAirportCoords(iata);
+                            if (coords) { flightStatus.arrival.airport = coords.name; flightStatus.arrival.latitude = coords.lat; flightStatus.arrival.longitude = coords.lng; }
+                        }
+                    }
+                    if (route?.departureIcao || route?.arrivalIcao) console.log('✅ [A1] Airports resolved via OpenSky route');
+                } catch (e) { console.warn('[A1] OpenSky route lookup failed:', e); }
+            }
 
             // [A2] Amadeus schedule lookup using the actual broadcasting callsign
             if ((flightStatus.departure.code === '---' || flightStatus.arrival.code === '---') && hasAmadeusCredentials) {
@@ -625,6 +657,36 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
                 } catch (e) { console.warn('[A3] AviationStack fallback failed:', e); }
             }
 
+            // [A4] hexdb.io aircraft info — if we still need aircraft details
+            if (flightStatus.aircraft.model === 'Unknown' && openSkyData.icao24) {
+                try {
+                    const { getAircraftInfoFromHexDB } = await import('./opensky');
+                    console.log('✈️ [A4] hexdb.io aircraft info for:', openSkyData.icao24);
+                    const acInfo = await getAircraftInfoFromHexDB(openSkyData.icao24);
+                    if (acInfo) {
+                        if (acInfo.type) flightStatus.aircraft.model = acInfo.type;
+                        if (acInfo.registration) flightStatus.aircraft.registration = acInfo.registration;
+                    }
+                } catch (e) { console.warn('[A4] hexdb.io aircraft info failed:', e); }
+            }
+
+            // ── RECALCULATE PROGRESS if we now have valid airport coordinates ──
+            if (flightStatus.departure.latitude !== 0 && flightStatus.arrival.latitude !== 0 && !isLanded) {
+                const { calculateDistance } = await import('./airports');
+                const totalDist = calculateDistance(
+                    flightStatus.departure.latitude, flightStatus.departure.longitude,
+                    flightStatus.arrival.latitude, flightStatus.arrival.longitude
+                );
+                const coveredDist = calculateDistance(
+                    flightStatus.departure.latitude, flightStatus.departure.longitude,
+                    openSkyData.latitude!, openSkyData.longitude!
+                );
+                if (totalDist > 0) {
+                    flightStatus.liveData.progress = Math.min(100, Math.max(0, Math.round((coveredDist / totalDist) * 100)));
+                    console.log(`📊 Recalculated progress: ${flightStatus.liveData.progress}%`);
+                }
+            }
+
             return flightStatus;
         }
 
@@ -676,7 +738,9 @@ async function getFlightDataFromAviationStack(flightNumber: string): Promise<Fli
         // 3. Then most recent flight
         const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
-        let flight = data.data.find((f: any) => f.flight_status === 'active') || // Active flight first
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const flight = data.data.find((f: any) => f.flight_status === 'active') || // Active flight first
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             data.data.find((f: any) => f.flight_date === today) ||        // Today's flight
             data.data[0];                                                   // Most recent
 
@@ -745,7 +809,7 @@ async function getFlightDataFromAviationStack(flightNumber: string): Promise<Fli
             flightNumber: flight.flight.iata,
             flightDate: flight.flight_date,
             airline: flight.airline.name,
-            status: flight.flight_status.charAt(0).toUpperCase() + flight.flight_status.slice(1) as any,
+            status: (flight.flight_status.charAt(0).toUpperCase() + flight.flight_status.slice(1)) as FlightStatus['status'],
             departure: {
                 airport: flight.departure.airport,
                 code: flight.departure.iata,
