@@ -216,9 +216,7 @@ export async function getFlightData(flightNumber: string): Promise<FlightStatus 
             // If the API returned a 200 but with an "error" or "notFound" field
             if (data && data.error) {
                 console.warn(`⚠️ [Client] API returned error for ${trimmedFlightNumber}:`, data.error);
-                // If it's just a "not found", we return null to show the default message
-                // otherwise we might want to throw to show the specific error
-                if (data.notFound) return null;
+                // Throw the error so the UI shows the specific message from the server
                 throw new Error(data.error);
             }
 

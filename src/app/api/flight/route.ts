@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
         console.log(`✅ [API Route] Returning data for flight: ${flightNumber}`);
         return NextResponse.json(data);
     } catch (error) {
-        console.error('[API Route] Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        const errorMessage = error instanceof Error ? error.message : 'An error occurred while fetching flight data.';
+        console.error('[API Route] Error:', errorMessage);
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }
