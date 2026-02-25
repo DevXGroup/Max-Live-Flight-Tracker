@@ -663,7 +663,10 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
                             }
                             if (aData.departure?.iataCode || aData.arrival?.iataCode) console.log('✅ [A2] Airports resolved via Amadeus');
                         }
-                    } catch (e) { console.warn('[A2] Amadeus callsign lookup failed:', e); }
+                    } catch (e) {
+                        if (e instanceof Error && e.message.toLowerCase().includes('rate limit')) throw e;
+                        console.warn('[A2] Amadeus callsign lookup failed:', e);
+                    }
                 }
             }
 
@@ -693,7 +696,10 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
                         }
                         console.log('✅ [A3] Airports resolved via AviationStack');
                     }
-                } catch (e) { console.warn('[A3] AviationStack fallback failed:', e); }
+                } catch (e) {
+                    if (e instanceof Error && e.message.toLowerCase().includes('rate limit')) throw e;
+                    console.warn('[A3] AviationStack fallback failed:', e);
+                }
             }
 
             // [A4] hexdb.io aircraft info — if we still need aircraft details
@@ -902,6 +908,9 @@ async function getFlightDataFromAviationStack(flightNumber: string): Promise<Fli
         };
 
     } catch (error) {
+        if (error instanceof Error && error.message.toLowerCase().includes('rate limit')) {
+            throw error;
+        }
         console.error('API Error:', error);
         return null;
     }

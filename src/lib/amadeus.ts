@@ -183,6 +183,10 @@ export async function getFlightStatusFromAmadeus(
             },
         };
     } catch (error) {
+        // Propagate rate-limit errors up to the main chain
+        if (error instanceof Error && error.message.toLowerCase().includes('rate limit')) {
+            throw error;
+        }
         console.error('Amadeus API error:', error);
         return null;
     }
