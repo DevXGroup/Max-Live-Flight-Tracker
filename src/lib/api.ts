@@ -735,7 +735,15 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
             return flightStatus;
         }
 
-        console.log('❌ Flight not found in Amadeus or OpenSky');
+        console.log('❌ Flight not found in Amadeus or OpenSky. Attempting FlightAware Web Scraping fallback...');
+        const { scrapeFlightAware } = await import('./flightaware');
+        const fallbackData = await scrapeFlightAware(flightNumber);
+        if (fallbackData) {
+            console.log('✅ Fallback FlightAware web scraping succeeded!');
+            return fallbackData;
+        }
+
+        console.log('❌ FlightAware fallback also failed.');
         return null;
 
     } catch (error) {
