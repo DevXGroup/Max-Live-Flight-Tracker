@@ -111,9 +111,13 @@ export async function scrapeFlightAware(flightNumber: string): Promise<FlightSta
 
                     // Remaining time
                     let remainingTime = isLanded ? 'Arrived' : 'Calculating...';
-                    if (status === 'Active' && arrivalTimeEstimated) {
-                        const { calculateRemainingTime } = await import('./api');
-                        remainingTime = calculateRemainingTime(arrivalTimeEstimated);
+                    if (!isLanded && arrivalTimeEstimated) {
+                        try {
+                            const { calculateRemainingTime } = await import('./flightUtils');
+                            remainingTime = calculateRemainingTime(arrivalTimeEstimated);
+                        } catch (e) {
+                            console.error('[FlightAware] Duration calculation failed:', e);
+                        }
                     }
 
                     const result: FlightStatus = {
@@ -147,9 +151,9 @@ export async function scrapeFlightAware(flightNumber: string): Promise<FlightSta
                         aircraft: {
                             model: f.aircraft?.friendlyType || f.aircraft?.type || 'Unknown',
                             registration: f.tail || 'Unknown',
-                            speed: lastPos ? lastPos.gs : 0, // kts
-                            altitude: lastPos ? lastPos.alt * 100 : 0, // ft
-                            heading: lastPos?.heading || 0,
+                            speed: lastPos?.gs ? Number(lastPos.gs) : 0, // kts
+                            altitude: lastPos?.alt ? Number(lastPos.alt) * 100 : 0, // ft (FlightAware alt is often in FL, e.g. 350 = 35000ft)
+                            heading: lastPos?.heading ? Number(lastPos.heading) : 0,
                         },
                         liveData: {
                             latitude: currentLat,

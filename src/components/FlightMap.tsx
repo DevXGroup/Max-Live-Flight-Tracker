@@ -6,7 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { FlightStatus } from '@/lib/api';
 import { RefreshCw } from 'lucide-react';
-import { calculateDistance, interpolatePosition } from '@/lib/airports';
+import { calculateDistance, interpolatePosition, calculateBearing } from '@/lib/airports';
 
 // Fix for default marker icon
 const iconUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
@@ -73,6 +73,9 @@ export default function FlightMap({ flight, onRefresh }: FlightMapProps) {
     // A better way: interpolate from origin to plane for the traveled blue line
     const traveledPath = hasOrigin ? getCurvedPath(originPos, planePos) : [];
     const remainingPath = hasDest ? getCurvedPath(planePos, destPos) : [];
+
+    // Calculate heading (bearing) if the API doesn't provide one
+    const visualHeading = flight.aircraft.heading || (hasDest ? calculateBearing(planePos[0], planePos[1], destPos[0], destPos[1]) : 0);
 
     // Dynamic Plane Icon with rotation
     const getPlaneIcon = (heading: number) => L.divIcon({
@@ -174,7 +177,7 @@ export default function FlightMap({ flight, onRefresh }: FlightMapProps) {
                 )}
 
                 {/* Plane Marker */}
-                <Marker position={planePos} icon={getPlaneIcon(flight.aircraft.heading)}>
+                <Marker position={planePos} icon={getPlaneIcon(visualHeading)}>
                     <Popup>
                         <div className="p-1 min-w-[150px]">
                             <div className="font-bold text-blue-400 flex items-center justify-between mb-1">

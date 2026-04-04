@@ -177,25 +177,8 @@ const MOCK_FLIGHTS: Record<string, FlightStatus> = {
     }
 };
 
-// Helper function to calculate remaining time
-export function calculateRemainingTime(arrivalTime: string): string {
-    const now = new Date();
-    const arrival = new Date(arrivalTime);
-    const diffMs = arrival.getTime() - now.getTime();
-
-    if (diffMs <= 0) {
-        return 'Arrived';
-    }
-
-    const diffMins = Math.floor(diffMs / 60000);
-    const hours = Math.floor(diffMins / 60);
-    const mins = diffMins % 60;
-
-    if (hours > 0) {
-        return `${hours}h ${mins}m`;
-    }
-    return `${mins}m`;
-}
+// Time calculation is now in flightUtils.ts
+import { calculateRemainingTime } from './flightUtils';
 
 export async function getFlightData(flightNumber: string): Promise<FlightStatus | null> {
     const trimmedFlightNumber = flightNumber.trim().toUpperCase();
