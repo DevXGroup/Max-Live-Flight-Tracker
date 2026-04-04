@@ -178,7 +178,7 @@ const MOCK_FLIGHTS: Record<string, FlightStatus> = {
 };
 
 // Helper function to calculate remaining time
-function calculateRemainingTime(arrivalTime: string): string {
+export function calculateRemainingTime(arrivalTime: string): string {
     const now = new Date();
     const arrival = new Date(arrivalTime);
     const diffMs = arrival.getTime() - now.getTime();
@@ -476,7 +476,7 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
                     model: 'Unknown',
                     registration: openSkyData?.icao24?.toUpperCase() || 'TBD',
                     speed: openSkyData?.velocity ? Math.round(openSkyData.velocity * 1.94384) : 0,
-                    altitude: openSkyData?.baro_altitude || openSkyData?.geo_altitude || 0,
+                    altitude: openSkyData?.baro_altitude ? Math.round(openSkyData.baro_altitude * 3.28084) : (openSkyData?.geo_altitude ? Math.round(openSkyData.geo_altitude * 3.28084) : 0),
                     heading: openSkyData?.true_track || 0,
                 },
                 liveData: {
@@ -575,13 +575,13 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
                     model: openSkyData.aircraftType || 'Unknown',
                     registration: openSkyData.registration || openSkyData.icao24.toUpperCase(),
                     speed: openSkyData.velocity ? Math.round(openSkyData.velocity * 1.94384) : 0,
-                    altitude: openSkyData.baro_altitude || openSkyData.geo_altitude || 0,
+                    altitude: openSkyData.baro_altitude ? Math.round(openSkyData.baro_altitude * 3.28084) : (openSkyData.geo_altitude ? Math.round(openSkyData.geo_altitude * 3.28084) : 0),
                     heading: openSkyData.true_track || 0,
                 },
                 liveData: {
                     latitude: openSkyData.latitude,
                     longitude: openSkyData.longitude,
-                    progress: isLanded ? 100 : 50,
+                    progress: isLanded ? 100 : 0, // Will be recalculated below if airports found
                     remainingTime: isLanded ? 'Arrived' : 'Live Tracking',
                 },
             };

@@ -38,7 +38,7 @@ export async function scrapeFlightAware(flightNumber: string): Promise<FlightSta
             
             res.on('data', chunk => data += chunk);
             
-            res.on('end', () => {
+            res.on('end', async () => {
                 if (res.statusCode !== 200) {
                     console.log(`[FlightAware] URL returned status code ${res.statusCode}`);
                     return resolve(null);
@@ -98,6 +98,24 @@ export async function scrapeFlightAware(flightNumber: string): Promise<FlightSta
                     const arrivalTimeScheduled = safeDate(f.gateArrivalTimes?.scheduled || null);
                     const arrivalTimeEstimated = safeDate(f.gateArrivalTimes?.estimated || null);
 
+                    // Calculate Progress
+                    let progress = isLanded ? 100 : 0;
+                    if (!isLanded && depCoords && arrCoords) {
+                        const { calculateDistance } = await import('./airports');
+                        const totalDist = calculateDistance(depCoords.lat, depCoords.lng, arrCoords.lat, arrCoords.lng);
+                        const coveredDist = calculateDistance(depCoords.lat, depCoords.lng, currentLat, currentLng);
+                        if (totalDist > 0) {
+                            progress = Math.min(99, Math.max(0, Math.round((coveredDist / totalDist) * 100)));
+                        }
+                    }
+
+                    // Remaining time
+                    let remainingTime = isLanded ? 'Arrived' : 'Calculating...';
+                    if (status === 'Active' && arrivalTimeEstimated) {
+                        const { calculateRemainingTime } = await import('./api');
+                        remainingTime = calculateRemainingTime(arrivalTimeEstimated);
+                    }
+
                     const result: FlightStatus = {
                         flightNumber: f.ident || flightNumber,
                         flightDate: now.toISOString().split('T')[0],
@@ -130,14 +148,14 @@ export async function scrapeFlightAware(flightNumber: string): Promise<FlightSta
                             model: f.aircraft?.friendlyType || f.aircraft?.type || 'Unknown',
                             registration: f.tail || 'Unknown',
                             speed: lastPos ? lastPos.gs : 0, // kts
-                            altitude: lastPos ? lastPos.alt * 100 : 0, // ft (FlightAware alt is FL)
-                            heading: 0,
+                            altitude: lastPos ? lastPos.alt * 100 : 0, // ft
+                            heading: lastPos?.heading || 0,
                         },
                         liveData: {
                             latitude: currentLat,
                             longitude: currentLng,
-                            progress: isLanded ? 100 : 50, // basic fallback, can be improved
-                            remainingTime: isLanded ? 'Arrived' : 'Calculating',
+                            progress: progress,
+                            remainingTime: remainingTime,
                         }
                     };
                     
