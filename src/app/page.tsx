@@ -167,12 +167,12 @@ export default function Home() {
             >
               <img
                 src="/devx-logo.png"
-                alt="Devx Group LLC Logo"
+                alt="DevXGroup LLC Logo"
                 className="h-8 w-auto object-contain brightness-90 group-hover:brightness-110 group-hover:scale-105 transition-all"
               />
               <div className="text-left">
                 <p className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-semibold">Brought to you by</p>
-                <p className="font-bold text-slate-300 group-hover:text-blue-400 transition-colors tracking-tight">Devx Group LLC</p>
+                <p className="font-bold text-slate-300 group-hover:text-blue-400 transition-colors tracking-tight">DevXGroup LLC</p>
                 <p className="text-[10px] text-slate-500">Premium Software Solutions</p>
               </div>
             </a>
@@ -182,7 +182,7 @@ export default function Home() {
               <a href="https://devxgroup.io/services" className="text-xs text-slate-500 hover:text-blue-400 transition-colors">Services</a>
             </div>
             <div className="h-px w-32 bg-gradient-to-r from-transparent via-slate-800 to-transparent my-2"></div>
-            <p className="text-[10px] text-slate-600 uppercase tracking-widest">© {new Date().getFullYear()} Devx Group LLC. All rights reserved.</p>
+            <p className="text-[10px] text-slate-600 uppercase tracking-widest">© {new Date().getFullYear()} DevXGroup LLC. All rights reserved.</p>
           </div>
         </footer>
 
