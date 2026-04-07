@@ -24,6 +24,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
 
   const handleSearch = async (flightNumber: string) => {
@@ -39,6 +40,7 @@ export default function Home() {
 
       if (data) {
         setFlightData(data);
+        setSearchQuery(flightNumber); // Remember the successful search query
         setLastUpdate(new Date());
       } else {
         setError('Flight not found. Try "AA123", "BA249", or "LH400".');
@@ -54,11 +56,11 @@ export default function Home() {
   };
 
   const handleRefresh = async () => {
-    if (!flightData) return;
+    if (!flightData || !searchQuery) return;
 
-    console.log('🔄 Refreshing flight data...');
+    console.log('🔄 Refreshing flight data using query:', searchQuery);
     try {
-      const data = await getFlightData(flightData.flightNumber);
+      const data = await getFlightData(searchQuery);
       if (data) {
         setFlightData(data);
         setLastUpdate(new Date());
