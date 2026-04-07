@@ -529,7 +529,7 @@ async function getFlightDataFromOpenSky(flightNumber: string): Promise<FlightSta
                 : openSkyData.origin_country;
 
             const flightStatus: FlightStatus = {
-                flightNumber: openSkyData.callsign?.trim() || flightNumber,
+                flightNumber: flightNumber,
                 flightDate: now.toISOString().split('T')[0],
                 airline: airlineName,
                 status: isLanded ? 'Landed' : 'Active',
@@ -857,7 +857,7 @@ async function getFlightDataFromAviationStack(flightNumber: string): Promise<Fli
         const heading = calculateBearing(currentPos.lat, currentPos.lng, arrCoords.lat, arrCoords.lng);
 
         return {
-            flightNumber: flight.flight.iata,
+            flightNumber: flightNumber,
             flightDate: flight.flight_date,
             airline: flight.airline.name,
             status: (flight.flight_status.charAt(0).toUpperCase() + flight.flight_status.slice(1)) as FlightStatus['status'],
