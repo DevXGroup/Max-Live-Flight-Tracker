@@ -121,7 +121,7 @@ export async function scrapeFlightAware(flightNumber: string): Promise<FlightSta
                     }
 
                     const result: FlightStatus = {
-                        flightNumber: f.ident || flightNumber,
+                        flightNumber: flightNumber,
                         flightDate: now.toISOString().split('T')[0],
                         airline: f.airline?.shortName || f.airline?.fullName || 'Unknown',
                         status: status,
