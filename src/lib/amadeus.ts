@@ -1,8 +1,12 @@
 // Amadeus Flight Status API integration
 // Documentation: https://developers.amadeus.com/self-service/category/air/api-doc/on-demand-flight-status
 
-const AMADEUS_API_KEY = process.env.AMADEUS_API_KEY || process.env.NEXT_PUBLIC_AMADEUS_API_KEY || '';
-const AMADEUS_API_SECRET = process.env.AMADEUS_API_SECRET || process.env.NEXT_PUBLIC_AMADEUS_API_SECRET || '';
+// Server-only. These deliberately have no NEXT_PUBLIC_ fallback: Next inlines
+// any NEXT_PUBLIC_ value into the JavaScript bundle, and this module is
+// imported by src/app/page.tsx, which is a client component. A NEXT_PUBLIC_
+// fallback here would have handed the Amadeus secret to every visitor.
+const AMADEUS_API_KEY = process.env.AMADEUS_API_KEY || '';
+const AMADEUS_API_SECRET = process.env.AMADEUS_API_SECRET || '';
 
 export const hasAmadeusCredentials = !!(AMADEUS_API_KEY && AMADEUS_API_SECRET);
 

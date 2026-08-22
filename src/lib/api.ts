@@ -41,7 +41,9 @@ export interface FlightStatus {
     };
 }
 
-const AVIATION_STACK_KEY = process.env.AVIATION_STACK_KEY || process.env.NEXT_PUBLIC_AVIATION_STACK_KEY;
+// Server-only, no NEXT_PUBLIC_ fallback. See the note in lib/amadeus.ts: this
+// module reaches client components, and NEXT_PUBLIC_ values ship to the browser.
+const AVIATION_STACK_KEY = process.env.AVIATION_STACK_KEY;
 
 // Data source configuration
 export type DataSource = 'aviationstack' | 'opensky' | 'hybrid';
