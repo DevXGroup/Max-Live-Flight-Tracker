@@ -1,17 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { motion, useMotionValue, useSpring, useAnimationFrame } from 'framer-motion';
+import { useEffect, useRef } from 'react';
 
 interface Point {
     x: number;
     y: number;
-    originX: number;
-    originY: number;
-    color: string;
+    isPlane: boolean;
 }
 
-const NUM_DOTS = 100;
 const PLANE_POINTS = [
     // Fuselage
     { x: 0, y: -40 }, { x: 0, y: -30 }, { x: 0, y: -20 }, { x: 0, y: -10 },
@@ -25,137 +21,135 @@ const PLANE_POINTS = [
 ];
 
 export default function InteractiveBackground() {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const mouseX = useMotionValue(0);
-    const mouseY = useMotionValue(0);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    const smoothX = useSpring(mouseX, { stiffness: 50, damping: 20 });
-    const smoothY = useSpring(mouseY, { stiffness: 50, damping: 20 });
-
-    const [dotsList, setDotsList] = useState<Point[]>([]);
-    const [isMounted, setIsMounted] = useState(false);
-
-    // Initialize dots
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setIsMounted(true);
-        const newDots: Point[] = [];
-        // Initialize mouse to center to avoid initial jump
-        mouseX.set(window.innerWidth / 2);
-        mouseY.set(window.innerHeight / 2);
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
 
+        // A full-screen canvas repainting every frame is a bad trade on mobile
+        // for a purely decorative background: it costs real battery and jank and
+        // adds zero function. So we skip it entirely on touch/small screens and
+        // when the viewer asked for reduced motion. Desktop gets the full effect.
+        const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+        const isMobile = coarsePointer || window.innerWidth < 768;
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        if (isMobile || reduceMotion) return;
+
+        const NUM_DOTS = 100;
+        const interactive = true;
+
+        // Build dots: first PLANE_POINTS are the plane, rest scattered.
+        const dots: Point[] = [];
         for (let i = 0; i < NUM_DOTS; i++) {
-            // Some dots form a plane, others are scattered
-            const isPlanePart = i < PLANE_POINTS.length;
-            const planePoint = PLANE_POINTS[i];
-
-            newDots.push({
-                x: isPlanePart ? planePoint.x : (Math.random() - 0.5) * window.innerWidth,
-                y: isPlanePart ? planePoint.y : (Math.random() - 0.5) * window.innerHeight,
-                originX: (Math.random() - 0.5) * window.innerWidth,
-                originY: (Math.random() - 0.5) * window.innerHeight,
-                color: isPlanePart ? '#3b82f6' : '#64748b', // Blue for plane, slate for others
+            const isPlane = i < PLANE_POINTS.length;
+            dots.push({
+                x: isPlane ? PLANE_POINTS[i].x : (Math.random() - 0.5) * window.innerWidth,
+                y: isPlane ? PLANE_POINTS[i].y : (Math.random() - 0.5) * window.innerHeight,
+                isPlane,
             });
         }
-        setDotsList(newDots);
-    }, []);
 
-    useEffect(() => {
+        let width = 0;
+        let height = 0;
+        let dpr = 1;
+
+        const resize = () => {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            // Cap DPR at 2 so retina phones don't render a 3x buffer.
+            dpr = Math.min(window.devicePixelRatio || 1, 2);
+            canvas.width = Math.floor(width * dpr);
+            canvas.height = Math.floor(height * dpr);
+            canvas.style.width = `${width}px`;
+            canvas.style.height = `${height}px`;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        };
+        resize();
+
+        let mouseX = width / 2;
+        let mouseY = height / 2;
         const handleMouseMove = (e: MouseEvent) => {
-            mouseX.set(e.clientX);
-            mouseY.set(e.clientY);
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        };
+        if (interactive) window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('resize', resize);
+
+        let rafId = 0;
+        const draw = (t: number) => {
+            ctx.clearRect(0, 0, width, height);
+
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const time = t / 2000;
+            const breathe = Math.sin(time) * 0.5 + 1;
+
+            for (let i = 0; i < dots.length; i++) {
+                const dot = dots[i];
+
+                const angle = time * 0.5 + i * 0.05;
+                const swirlX = Math.cos(angle) * 50 * breathe;
+                const swirlY = Math.sin(angle) * 50 * breathe;
+
+                let finalX = centerX + dot.x * 5 * breathe + swirlX;
+                let finalY = centerY + dot.y * 5 * breathe + swirlY;
+
+                const floatTime = t / 1000;
+                finalX += Math.sin(floatTime + i) * 20;
+                finalY += Math.cos(floatTime + i) * 20;
+
+                let active = false;
+                if (interactive) {
+                    const dx = mouseX - finalX;
+                    const dy = mouseY - finalY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const maxDist = 400;
+                    const force = Math.max(0, (maxDist - dist) / maxDist);
+                    finalX += dx * force * -3;
+                    finalY += dy * force * -3;
+                    active = force > 0.5;
+                }
+
+                const size = active ? 4 : 3;
+                ctx.beginPath();
+                ctx.arc(finalX, finalY, size / 2, 0, Math.PI * 2);
+                if (active) {
+                    ctx.fillStyle = '#3b82f6';
+                    ctx.globalAlpha = 1;
+                    ctx.shadowColor = '#3b82f6';
+                    ctx.shadowBlur = 10;
+                } else {
+                    ctx.fillStyle = dot.isPlane ? '#60a5fa' : '#94a3b8';
+                    ctx.globalAlpha = 0.6;
+                    ctx.shadowBlur = 0;
+                }
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+            ctx.shadowBlur = 0;
+
+            if (!reduceMotion) rafId = requestAnimationFrame(draw);
         };
 
-        window.addEventListener('mousemove', handleMouseMove);
-        return () => window.removeEventListener('mousemove', handleMouseMove);
-    }, [mouseX, mouseY]);
+        // Reduced motion: draw a single static frame, no loop.
+        rafId = requestAnimationFrame(draw);
 
-    if (!isMounted) return null;
-
-    return (
-        <div ref={containerRef} className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-            {dotsList.map((dot, i) => (
-                <Dot
-                    key={i}
-                    dot={dot}
-                    mouseX={smoothX}
-                    mouseY={smoothY}
-                    index={i}
-                />
-            ))}
-        </div>
-    );
-}
-
-import { MotionValue } from 'framer-motion';
-
-function Dot({ dot, mouseX, mouseY, index }: { dot: Point, mouseX: MotionValue<number>, mouseY: MotionValue<number>, index: number }) {
-    const ref = useRef<HTMLDivElement>(null);
-
-    useAnimationFrame((t) => {
-        if (!ref.current) return;
-
-        const currentMouseX = mouseX.get();
-        const currentMouseY = mouseY.get();
-
-        const centerX = window.innerWidth / 2;
-        const centerY = window.innerHeight / 2;
-
-        // Converge/Diverge Breathing Pattern
-        const time = t / 2000; // Slow breathing
-        const breathe = Math.sin(time) * 0.5 + 1; // Oscillates between 0.5 and 1.5
-
-        // Swirl effect
-        const angle = time * 0.5 + (index * 0.05);
-        const swirlX = Math.cos(angle) * 50 * breathe;
-        const swirlY = Math.sin(angle) * 50 * breathe;
-
-        // Base position with breathing
-        const targetX = centerX + (dot.x * 5 * breathe) + swirlX;
-        const targetY = centerY + (dot.y * 5 * breathe) + swirlY;
-
-        // Add some individual floating movement
-        const floatTime = t / 1000;
-        const floatX = Math.sin(floatTime + index) * 20;
-        const floatY = Math.cos(floatTime + index) * 20;
-
-        const finalX = targetX + floatX;
-        const finalY = targetY + floatY;
-
-        const dx = currentMouseX - finalX;
-        const dy = currentMouseY - finalY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        // Interaction radius
-        const maxDist = 400;
-        const force = Math.max(0, (maxDist - dist) / maxDist);
-
-        // Repulsion
-        const repulsionX = dx * force * -3;
-        const repulsionY = dy * force * -3;
-
-        ref.current.style.transform = `translate(${finalX + repulsionX}px, ${finalY + repulsionY}px)`;
-
-        // Change color based on proximity
-        // Make dots more visible generally
-        const isActive = force > 0.5;
-        ref.current.style.backgroundColor = isActive ? '#3b82f6' : (dot.color === '#3b82f6' ? '#60a5fa' : '#94a3b8');
-        ref.current.style.opacity = isActive ? '1' : '0.6';
-        ref.current.style.width = isActive ? '4px' : '3px';
-        ref.current.style.height = isActive ? '4px' : '3px';
-        ref.current.style.boxShadow = isActive ? '0 0 10px #3b82f6' : 'none';
-    });
+        return () => {
+            cancelAnimationFrame(rafId);
+            if (interactive) window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('resize', resize);
+        };
+    }, []);
 
     return (
-        <div
-            ref={ref}
-            className="absolute rounded-full transition-colors duration-300"
-            style={{
-                backgroundColor: dot.color,
-                left: 0,
-                top: 0,
-                willChange: 'transform',
-            }}
+        <canvas
+            ref={canvasRef}
+            className="fixed inset-0 pointer-events-none z-0"
+            aria-hidden="true"
         />
     );
 }
