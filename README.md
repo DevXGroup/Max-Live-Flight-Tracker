@@ -29,7 +29,7 @@ needs no key. See `.env.example` for the exact variable names.
 
 ## Docs
 
-- `BRIEF.md` — what this is, who it's for, current status
-- `BACKLOG.md` — open items and history
-- `FEATURES.md` — full feature list as of the last major update
-- `CLAUDE.md` / `AGENTS.md` — instructions for AI agents working in this repo
+- `BRIEF.md`, what this is, who it's for, current status
+- `BACKLOG.md`, open items and history
+- `FEATURES.md`, full feature list as of the last major update
+- `CLAUDE.md` / `AGENTS.md`, instructions for AI agents working in this repo

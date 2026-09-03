@@ -46,7 +46,7 @@ This project used to be flagged dormant and outside version control. That's no l
 accurate: it has a real git history (30+ commits), a clean working tree, and is deployed
 live at `flight.devxgroup.io`, which returned a 200 on 2026-09-02. `health` is
 `needs-testing` rather than `green` because nothing here was verified beyond "the homepage
-loads" — actual flight search and the API fallback chain were not exercised in this pass.
+loads", actual flight search and the API fallback chain were not exercised in this pass.
 
 ## Rejected / not resurrected
 

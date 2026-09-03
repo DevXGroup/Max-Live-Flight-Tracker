@@ -6,9 +6,9 @@ Read in this order: `BRIEF.md`, `BACKLOG.md`, `CLAUDE.md`.
 
 ## Commands
 
-- `npm run dev` — local dev server
-- `npm run build` — production build
-- `npm run lint` — ESLint (no separate test suite exists)
+- `npm run dev`, local dev server
+- `npm run build`, production build
+- `npm run lint`, ESLint (no separate test suite exists)
 
 ## Rules that actually bite
 
