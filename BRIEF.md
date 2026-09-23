@@ -1,3 +1,8 @@
+---
+oneLiner: "Web app that tracks any flight live on a map by its flight number"
+category: website
+status: paused
+---
 # Live Flight Tracker, in one page
 
 > Deeper docs: `BACKLOG.md` for what's next, `README.md` for how to run it, `FEATURES.md` for
