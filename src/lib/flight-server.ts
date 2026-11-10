@@ -1,7 +1,7 @@
 import 'server-only';
 import { FlightLookupError, type FlightStatus } from './flight-types';
 import { CALLSIGN_ALIASES, callsignMatches, emptyFlight, missingFlightFields, normalizeAircraft, normalizeFlightNumber, parseAdsbSnapshot, remainingTimeFromEstimate, selectAircraft, withPosition } from './flight-normalize';
-import { getReferenceRoute } from './flight-route-reference';
+import { getReferenceAirport, getReferenceRoute } from './flight-route-reference';
 import { getAirlineName } from './utils';
 import { getAirportCoords, icaoToIata } from './airports';
 
@@ -128,7 +128,9 @@ function scheduleTimes(flight: AviationStackFlight) {
     };
 }
 
-function chooseScheduleCandidate(flights: AviationStackFlight[], flightNumber: string, nowMs: number): AviationStackFlight | null {
+type ScheduleSelection = { flight: AviationStackFlight; historicalFallback: boolean };
+
+function chooseScheduleCandidate(flights: AviationStackFlight[], flightNumber: string, nowMs: number): ScheduleSelection | null {
     const prefix = flightNumber.match(/^([A-Z]{3}|[A-Z][A-Z0-9]|[0-9][A-Z])/);
     if (!prefix) return null;
     const param = prefix[1].length === 3 ? 'flight_icao' : 'flight_iata';
@@ -153,42 +155,44 @@ function chooseScheduleCandidate(flights: AviationStackFlight[], flightNumber: s
         return !!departure && !actualArrival && Date.parse(departure) >= nowMs - 36 * 60 * 60_000
             && Date.parse(departure) <= nowMs;
     });
-    if (active.length === 1) return active[0];
+    if (active.length === 1) return { flight: active[0], historicalFallback: false };
     if (active.length > 1) return null;
 
     const today = valid.filter(flight => {
         const zone = flight.departure?.timezone;
         return typeof zone === 'string' && flight.flight_date === airportLocalDate(new Date(nowMs).toISOString(), zone);
     });
-    if (today.length === 1) return today[0];
+    if (today.length === 1) return { flight: today[0], historicalFallback: false };
     if (today.length > 1) {
         const upcoming = today.filter(flight => {
             const dep = usableTime(flight.departure?.scheduled);
             return !!dep && Date.parse(dep) >= nowMs && ['scheduled', 'active'].includes(flight.flight_status ?? '');
         });
-        return upcoming.length === 1 ? upcoming[0] : null;
+        return upcoming.length === 1 ? { flight: upcoming[0], historicalFallback: false } : null;
     }
 
     const nextDay = valid.filter(flight => {
         const dep = usableTime(flight.departure?.scheduled);
         return !!dep && Date.parse(dep) >= nowMs && Date.parse(dep) <= nowMs + 24 * 60 * 60_000;
     });
-    if (nextDay.length === 1) return nextDay[0];
+    if (nextDay.length === 1) return { flight: nextDay[0], historicalFallback: false };
     if (nextDay.length > 1) return null;
 
     const recentlyLanded = valid.filter(flight => {
         if (flight.flight_status !== 'landed') return false;
         const { arrival } = scheduleTimes(flight);
-        return !!arrival && Date.parse(arrival) <= nowMs && Date.parse(arrival) >= nowMs - 6 * 60 * 60_000;
+        return !!arrival && Date.parse(arrival) <= nowMs && Date.parse(arrival) >= nowMs - 24 * 60 * 60_000;
     });
-    return recentlyLanded.length === 1 ? recentlyLanded[0] : null;
+    return recentlyLanded.length === 1 ? { flight: recentlyLanded[0], historicalFallback: true } : null;
 }
 
-function airportFrom(v?: Partial<AirportResult>) {
+async function airportFrom(v?: Partial<AirportResult>) {
     const validLatitude = typeof v?.latitude === 'number' && Number.isFinite(v.latitude) && v.latitude >= -90 && v.latitude <= 90 ? v.latitude : null;
     const validLongitude = typeof v?.longitude === 'number' && Number.isFinite(v.longitude) && v.longitude >= -180 && v.longitude <= 180 ? v.longitude : null;
     let latitude = validLatitude, longitude = validLongitude;
     let local: ReturnType<typeof getAirportCoords> = null;
+    let airport = safeText(v?.airport, 160);
+    let usedStandingData = false;
     if (latitude === null || longitude === null) {
         const iata = typeof v?.iata === 'string' && /^[A-Z]{3}$/i.test(v.iata)
             ? v.iata.toUpperCase()
@@ -196,16 +200,29 @@ function airportFrom(v?: Partial<AirportResult>) {
         if (iata) local = getAirportCoords(iata);
         latitude = local?.lat ?? null;
         longitude = local?.lng ?? null;
+        airport ??= local?.name ?? null;
     }
-    return {
-        airport: safeText(v?.airport, 160) ?? local?.name ?? null,
+    const icao = safeText(v?.icao, 4)?.toUpperCase();
+    if ((latitude === null || longitude === null) && icao && /^[A-Z]{4}$/.test(icao)) {
+        const reference = await getReferenceAirport(icao);
+        if (reference && typeof reference.latitude === 'number' && typeof reference.longitude === 'number') {
+            latitude = reference.latitude;
+            longitude = reference.longitude;
+            airport ??= reference.airport ?? null;
+            usedStandingData = true;
+        }
+    }
+    return { value: {
+        airport,
         code: safeText(v?.iata, 4) ?? safeText(v?.icao, 4), terminal: safeText(v?.terminal, 32), gate: safeText(v?.gate, 32),
         scheduledTime: usableTime(v?.scheduled), estimatedTime: usableTime(v?.estimated), actualTime: usableTime(v?.actual), timezone: safeText(v?.timezone, 64),
         latitude, longitude,
-    };
+    }, usedStandingData };
 }
 
-async function getSchedule(flightNumber: string): Promise<Partial<FlightStatus> | null> {
+type ScheduleResult = { flight: Partial<FlightStatus>; historicalFallback: boolean };
+
+async function getSchedule(flightNumber: string): Promise<ScheduleResult | null> {
     if (process.env.DATA_SOURCE !== 'aviationstack' && process.env.DATA_SOURCE !== 'hybrid') return null;
     const key = process.env.AVIATION_STACK_KEY;
     if (!key) return null;
@@ -219,21 +236,32 @@ async function getSchedule(flightNumber: string): Promise<Partial<FlightStatus> 
         const response = await timedFetch(url.toString(), { headers: { Accept: 'application/json' } });
         if (!response.ok) return null;
         const body = await response.json() as { data?: AviationStackFlight[] };
-        const flight = chooseScheduleCandidate(body.data ?? [], flightNumber, Date.now());
-        if (!flight) return null;
+        const selection = chooseScheduleCandidate(body.data ?? [], flightNumber, Date.now());
+        if (!selection) return null;
+        const flight = selection.flight;
         const aircraftCode = [flight.aircraft?.icao, flight.aircraft?.iata].find(value => typeof value === 'string' && /^[A-Z0-9]{2,4}$/i.test(value));
         const status = scheduleStatus(flight);
-        return {
+        const chosenArrival = usableTime(flight.arrival?.actual) ?? usableTime(flight.arrival?.estimated) ?? usableTime(flight.arrival?.scheduled);
+        const isOlderCompletedRecord = flight.flight_status === 'landed' && !!chosenArrival
+            && Date.now() - Date.parse(chosenArrival) > 6 * 60 * 60_000;
+        const [departure, arrival] = await Promise.all([airportFrom(flight.departure), airportFrom(flight.arrival)]);
+        return { flight: {
             flightDate: safeText(flight.flight_date, 16),
             airline: safeText(flight.airline?.name, 128),
             status,
-            departure: airportFrom(flight.departure), arrival: airportFrom(flight.arrival),
+            departure: departure.value, arrival: arrival.value,
             aircraft: { model: aircraftCode?.toUpperCase() ?? null, registration: safeText(flight.aircraft?.registration, 16), speed: null, altitude: null, heading: null },
             // Progress is unsupported without a provider position-history/progress field; never derive it from route geometry.
             liveData: { latitude: null, longitude: null, progress: null, remainingTime: remainingTimeFromEstimate(usableTime(flight.arrival?.estimated), status) },
             dataSources: { position: null, route: null, schedule: 'aviationstack' },
-            dataQuality: { positionUpdatedAt: null, fetchedAt: new Date().toISOString(), routeConfidence: 'schedule', missingFields: [], warnings: [] },
-        };
+            dataQuality: {
+                positionUpdatedAt: null, fetchedAt: new Date().toISOString(), routeConfidence: 'schedule', missingFields: [],
+                warnings: [
+                    ...(isOlderCompletedRecord ? ['Showing the latest available completed flight for this flight number.'] : []),
+                    ...(departure.usedStandingData || arrival.usedStandingData ? ['Airport locations come from reference data. Trip details come from AviationStack.'] : []),
+                ],
+            },
+        }, historicalFallback: selection.historicalFallback };
     } catch { return null; }
 }
 
@@ -250,21 +278,25 @@ async function lookup(flightNumber: string): Promise<FlightStatus> {
     let positionError: unknown = null;
     try { observation = await getPosition(flightNumber); } catch (error) { positionError = error; }
     const schedule = await schedulePromise;
-    if (schedule) Object.assign(flight, schedule);
     let position: ReturnType<typeof normalizeAircraft> | null = null;
     if (observation) {
         try { position = normalizeAircraft(observation.aircraft, observation.snapshotTime); }
         catch (error) { positionError = error; }
     }
+    const ignoreSchedule = !!position && !!schedule && (
+        schedule.historicalFallback || (position.onGround === false && schedule.flight.status === 'Landed')
+    );
+    const appliedSchedule = schedule && !ignoreSchedule ? schedule.flight : null;
+    if (appliedSchedule) Object.assign(flight, appliedSchedule);
     if (position && observation) {
         withPosition(flight, position);
         flight.dataSources.position = observation.provider;
-    } else if (!schedule) {
+    } else if (!appliedSchedule) {
         if (positionError instanceof FlightLookupError) throw positionError;
         if (observation) throw new FlightLookupError('NOT_OBSERVED', 'No recent aircraft position was found.');
         throw new FlightLookupError('PROVIDERS_UNAVAILABLE', 'Flight data is temporarily unavailable.');
     }
-    if (!schedule && position) {
+    if (!appliedSchedule && position) {
         const airline = airlineFromCallsign(position.callsign);
         if (airline) {
             flight.airline = airline;
@@ -284,13 +316,13 @@ async function lookup(flightNumber: string): Promise<FlightStatus> {
             }
         } catch { /* Reference data is optional; retain the validated live position. */ }
     }
-    if (schedule) {
+    if (appliedSchedule) {
         flight.dataSources.route = 'aviationstack';
         flight.dataQuality.routeConfidence = 'schedule';
     } else if (!flight.dataSources.route) {
         flight.dataQuality.warnings.push('No verified current schedule is available; schedule times, gate, terminal, and route may be missing.');
     }
-    if (!position && schedule) flight.dataQuality.warnings.push('No recent aircraft position is available for this flight.');
+    if (!position && appliedSchedule) flight.dataQuality.warnings.push('No recent aircraft position is available for this flight.');
     flight.dataQuality.missingFields = missingFlightFields(flight);
     return flight;
 }

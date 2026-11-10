@@ -33,31 +33,35 @@ clean map and free data sources, no account or paywall.
 Not a product. No pricing, checkout, or monetization anywhere in the code. It's a free
 DevX Group side project.
 
-## Where things stand (2026-11-09)
+## Where things stand (2026-11-10)
 
-The live site has an unreliable legacy lookup and a separate map-tile failure: CARTO's
-old keyless tile URL renders API KEY REQUIRED images. Production has no configured flight API
-variables, Amadeus Self-Service is deprecated, and FlightAware scraping returned 402.
-Available Vercel environment activity records do not identify who cleared keys or whether
-they were ever configured. Local credential files were preserved without exposing values.
+The replacement is pushed to `main` at `0fd784019ee12633706cbea77bcc36b663d65fd4`.
+It uses adsb.lol observations, pinned CC0 VRS route references labeled unconfirmed,
+explicit nullable schedule fields, source/freshness metadata, and null-safe cards/maps.
+Real local hybrid checks confirmed AviationStack schedule details when available; missing
+position telemetry remains null.
 
-A replacement is verified locally: adsb.lol observations, pinned CC0 VRS route
-references labeled unconfirmed, explicit nullable schedule fields, source/freshness
-metadata, and null-safe cards/maps. The UI layout is preserved. No free source was
-verified to provide complete worldwide schedules, gates, terminals and telemetry together.
-See `docs/FLIGHT-DATA-CONTRACT.md` and `docs/TEST-LEDGER.md` for the final verification
-and deployment state. Production has not been changed by this repair yet.
+At Max's explicit release request, Production received server-side `AVIATION_STACK_KEY`
+and `DATA_SOURCE=hybrid` configuration. No secret value was written to this repository
+or the PowerKit vault. Commit `0fd784019ee12633706cbea77bcc36b663d65fd4` is deployed and
+the exact-SHA GitHub Actions workflow passed. A public UAL1759 lookup returned HTTP 200
+with an active ADS-B position and schedule data. A current SWA1781/WN1781 lookup returned
+404 even though AviationStack had a completed record from the previous day. The selector
+had stopped considering completed flights after six hours. A narrow local hotfix now
+extends that lookup window to 24 hours, warns when the completed record is older than six
+hours, and preserves ambiguity safeguards. The same hotfix adds missing airport coordinates
+from the pinned reference airport CSV using the schedule's validated ICAO code, and hides
+expired Early/On Time badges. The hotfix has not been deployed yet.
+See `docs/TEST-LEDGER.md` for the release and hotfix evidence.
 
 ## What happens next, in order
 
-1. Obtain approval before pushing the tested production release. The existing local
-   AviationStack key now passes real schedule/UI checks, including SWA1781 as Landed
-   with gates and aircraft details. It is absent from production and the canonical
-   vault. Max must add the missing vault key per his rule, then approve server-only
-   restoration with `DATA_SOURCE=hybrid`. Local checks and independent reviews pass;
-   see `docs/TEST-LEDGER.md`. The public alias still serves the old deployment.
-2. After an approved push, wait for GitHub Actions on that exact commit and verify the
-   Vercel alias serves it, including live and missing-data lookup behavior.
+1. Finish local verification and independent review of the history, airport-coordinate
+   and expired-estimate hotfixes. Then release them and verify SWA1781/WN1781 completed
+   schedule data, UAL1759 map endpoints, expired ETA badge, and missing-position behavior.
+2. Follow Max's credential-vault rule for future key management: the Production value
+   was restored through the authorized Vercel configuration path, but no copy was added
+   to the PowerKit vault. Do not print or copy the value.
 3. Add basic alerting for provider failures and consider a permission-cleared independent
    fallback. FlyItalyADSB Free requires separate account/key onboarding; no account was
    created and no spend or outbound provider contact was authorized by this repair.

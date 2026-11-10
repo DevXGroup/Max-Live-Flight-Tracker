@@ -132,10 +132,16 @@ test('schedule result remains useful when no receiver has a current position', a
 test('selects today service over previous-day landed records and prefers an active overnight flight', async () => {
     setEnv('DATA_SOURCE', 'aviationstack'); setEnv('AVIATION_STACK_KEY', 'test-only-placeholder'); setEnv('FLIGHT_POSITION_PROVIDERS', undefined);
     const before = globalThis.fetch;
-    const now = Date.now();
+    const beforeNow = Date.now;
+    const now = Date.UTC(2026, 10, 10, 11, 10, 0);
+    Date.now = () => now;
     const z = 'America/Los_Angeles';
     const time = (delta: number) => new Date(now + delta).toISOString();
-    const dateAt = (instant: string) => new Intl.DateTimeFormat('en-CA', { timeZone: z, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(instant));
+    const dateAt = (instant: string) => {
+        const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: z, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(instant)).map(part => [part.type, part.value]));
+        return `${parts.year}-${parts.month}-${parts.day}`;
+    };
+    assert.notEqual(dateAt(time(-14 * 60 * 60_000)), dateAt(time(0)), 'the landed fixture must be from the prior local service date');
     const row = (flightDate: string, status: string, dep: string, arr: string, destination: string, flightCode = 'WN930') => ({
         flight_date: flightDate, flight_status: status, flight: { iata: flightCode },
         departure: { iata: 'LAX', timezone: z, scheduled: dep },
@@ -147,7 +153,7 @@ test('selects today service over previous-day landed records and prefers an acti
         const request = new URL(url);
         const code = request.searchParams.get('flight_iata');
         if (code === 'WN930') return response({ data: [
-            row(dateAt(time(-26 * 60 * 60_000)), 'landed', time(-26 * 60 * 60_000), time(-2 * 60 * 60_000), 'SFO'),
+            row(dateAt(time(-14 * 60 * 60_000)), 'landed', time(-14 * 60 * 60_000), time(-12 * 60 * 60_000), 'SFO'),
             row(dateAt(time(0)), 'scheduled', time(0), time(60 * 60_000), 'SEA'),
         ] });
         return response({ data: [
@@ -162,7 +168,101 @@ test('selects today service over previous-day landed records and prefers an acti
         const overnight = await getFlightDataServer('WN931');
         assert.equal(overnight.status, 'Active');
         assert.equal(overnight.arrival.code, 'SFO');
-    } finally { globalThis.fetch = before; setEnv('DATA_SOURCE', undefined); setEnv('AVIATION_STACK_KEY', undefined); }
+    } finally { globalThis.fetch = before; Date.now = beforeNow; setEnv('DATA_SOURCE', undefined); setEnv('AVIATION_STACK_KEY', undefined); }
+});
+
+test('returns one previous-day completed record up to 24 hours old, warns after six, and rejects older or ambiguous history', async () => {
+    setEnv('DATA_SOURCE', 'aviationstack'); setEnv('AVIATION_STACK_KEY', 'test-only-placeholder'); setEnv('FLIGHT_POSITION_PROVIDERS', undefined);
+    const beforeFetch = globalThis.fetch;
+    const beforeNow = Date.now;
+    const now = Date.UTC(2026, 10, 10, 11, 10, 0);
+    Date.now = () => now;
+    const zone = 'America/Los_Angeles';
+    const at = (offsetHours: number) => new Date(now + offsetHours * 60 * 60_000).toISOString();
+    const dateAt = (instant: string) => new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(instant));
+    const landed = (flight: string, departureOffset: number, arrivalOffset: number, destination: string) => {
+        const departure = at(departureOffset), arrival = at(arrivalOffset);
+        return { flight_date: dateAt(departure), flight_status: 'landed', flight: { iata: flight },
+            departure: { iata: 'LAX', timezone: zone, scheduled: departure },
+            arrival: { iata: destination, timezone: zone, scheduled: arrival, actual: arrival } };
+    };
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('api.adsb.lol')) return response({ now, ac: [] });
+        if (url.includes('aviationstack.com')) {
+            const code = new URL(url).searchParams.get('flight_iata');
+            if (code === 'WN941') return response({ data: [landed('WN941', -14, -12, 'SFO')] });
+            if (code === 'WN942') return response({ data: [landed('WN942', -27, -25, 'SEA')] });
+            if (code === 'WN943') return response({ data: [landed('WN943', -14, -12, 'SFO'), landed('WN943', -13, -11, 'SEA')] });
+        }
+        return new Response('', { status: 404 });
+    }) as typeof fetch;
+    try {
+        const recent = await getFlightDataServer('WN941');
+        assert.equal(recent.status, 'Landed');
+        assert.equal(recent.flightDate, dateAt(at(-14)));
+        assert.equal(recent.arrival.code, 'SFO');
+        assert.equal(recent.liveData.latitude, null);
+        assert.equal(recent.dataSources.position, null);
+        assert.ok(recent.dataQuality.warnings.includes('Showing the latest available completed flight for this flight number.'));
+        await assert.rejects(getFlightDataServer('WN942'), /No recent position/);
+        await assert.rejects(getFlightDataServer('WN943'), /No recent position/);
+    } finally {
+        globalThis.fetch = beforeFetch;
+        Date.now = beforeNow;
+        setEnv('DATA_SOURCE', undefined); setEnv('AVIATION_STACK_KEY', undefined); setEnv('FLIGHT_POSITION_PROVIDERS', undefined);
+    }
+});
+
+test('fresh airborne position is never merged with a historical or conflicting landed schedule', async () => {
+    setEnv('DATA_SOURCE', 'aviationstack'); setEnv('AVIATION_STACK_KEY', 'test-only-placeholder'); setEnv('FLIGHT_POSITION_PROVIDERS', undefined);
+    const beforeFetch = globalThis.fetch;
+    const beforeNow = Date.now;
+    const now = Date.UTC(2026, 10, 10, 11, 10, 0);
+    Date.now = () => now;
+    const zone = 'America/Los_Angeles';
+    const at = (offsetHours: number) => new Date(now + offsetHours * 60 * 60_000).toISOString();
+    const dateAt = (instant: string) => {
+        const fields = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(instant)).map(part => [part.type, part.value]));
+        return `${fields.year}-${fields.month}-${fields.day}`;
+    };
+    const landed = (code: string, departure: string, arrival: string) => ({
+        flight_date: dateAt(departure), flight_status: 'landed', flight: { iata: code },
+        departure: { airport: 'Old departure', iata: 'LAX', timezone: zone, scheduled: departure, gate: 'OLD1' },
+        arrival: { airport: 'Old arrival', iata: 'SFO', timezone: zone, scheduled: arrival, actual: arrival, terminal: 'OLD2' },
+    });
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('api.adsb.lol')) {
+            const callsign = url.slice(url.lastIndexOf('/') + 1);
+            return response({ now, ac: [{ hex: 'abc123', flight: callsign, seen_pos: 5, lat: 39.8, lon: -104.7, alt_baro: 10_000, gs: 350, track: 90 }] });
+        }
+        if (url.includes('aviationstack.com')) {
+            const code = new URL(url).searchParams.get('flight_iata') ?? '';
+            if (code === 'WN946') return response({ data: [landed(code, at(-25), at(-23))] });
+            if (code === 'WN947') return response({ data: [landed(code, at(-1), at(-10 / 60))] });
+        }
+        return new Response('', { status: 404 });
+    }) as typeof fetch;
+    try {
+        for (const code of ['WN946', 'WN947']) {
+            const result = await getFlightDataServer(code);
+            assert.equal(result.status, 'Active');
+            assert.equal(result.liveData.latitude, 39.8);
+            assert.equal(result.liveData.longitude, -104.7);
+            assert.equal(result.dataSources.position, 'adsb.lol');
+            assert.equal(result.dataSources.schedule, null);
+            assert.equal(result.flightDate, null);
+            assert.equal(result.departure.code, null);
+            assert.equal(result.departure.gate, null);
+            assert.equal(result.arrival.code, null);
+            assert.equal(result.arrival.actualTime, null);
+        }
+    } finally {
+        globalThis.fetch = beforeFetch;
+        Date.now = beforeNow;
+        setEnv('DATA_SOURCE', undefined); setEnv('AVIATION_STACK_KEY', undefined); setEnv('FLIGHT_POSITION_PROVIDERS', undefined);
+    }
 });
 
 test('active schedule with an expired estimate cannot be replaced by a future trip', async () => {
@@ -279,7 +379,8 @@ test('malformed optional schedule strings do not discard a valid live position o
     const dep = new Date().toISOString();
     const arr = new Date(Date.now() + 60 * 60_000).toISOString();
     const zone = 'America/Los_Angeles';
-    const flightDate = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(dep));
+    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(dep)).map(part => [part.type, part.value]));
+    const flightDate = `${parts.year}-${parts.month}-${parts.day}`;
     globalThis.fetch = (async (input: RequestInfo | URL) => {
         const url = String(input);
         if (url.includes('api.adsb.lol')) return response(liveEnvelope('WN936'));
@@ -305,6 +406,51 @@ test('malformed optional schedule strings do not discard a valid live position o
         assert.equal(result.arrival.gate, null);
         assert.equal(result.aircraft.model, null);
         assert.equal(result.aircraft.registration, null);
+    } finally { globalThis.fetch = before; setEnv('DATA_SOURCE', undefined); setEnv('AVIATION_STACK_KEY', undefined); }
+});
+
+test('schedule airport absent from local list uses pinned CC0 coordinates by provider ICAO', async () => {
+    setEnv('DATA_SOURCE', 'aviationstack'); setEnv('AVIATION_STACK_KEY', 'test-only-placeholder'); setEnv('FLIGHT_POSITION_PROVIDERS', undefined);
+    const before = globalThis.fetch;
+    const dep = new Date(Date.now() - 2 * 60 * 60_000).toISOString();
+    const arr = new Date(Date.now() + 2 * 60 * 60_000).toISOString();
+    const zone = 'Pacific/Honolulu';
+    const dateParts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(dep)).map(part => [part.type, part.value]));
+    const flightDate = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+    const urls: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+        const url = String(input);
+        urls.push(url);
+        if (url.includes('api.adsb.lol')) {
+            const callsign = url.slice(url.lastIndexOf('/') + 1);
+            return response(liveEnvelope(callsign, { lat: 20.8986, lon: -156.4305 }));
+        }
+        if (url.includes('aviationstack.com')) {
+            const callsign = new URL(url).searchParams.get('flight_icao') ?? 'UAL1759';
+            const departure = callsign === 'UAL1760'
+                ? { airport: 'Unknown Airport', iata: 'XXX', icao: 'ZZZZ', timezone: zone, scheduled: dep }
+                : { airport: 'Kona International Airport', iata: 'KOA', icao: 'PHKO', timezone: zone, scheduled: dep };
+            return response({ data: [{ flight_date: flightDate, flight_status: 'active', flight: { icao: callsign },
+                departure, arrival: { airport: 'Denver International Airport', iata: 'DEN', icao: 'KDEN', timezone: zone, scheduled: arr, estimated: arr } }] });
+        }
+        if (url.includes('raw.githubusercontent.com/vradarserver/standing-data/') && url.endsWith('/airports/schema-01/P/PH.csv')) {
+            return new Response('Code,Name,ICAO,IATA,Location,CountryISO2,Latitude,Longitude,AltitudeFeet\nKOA,Kona International Airport,PHKO,KOA,Kailua-Kona,US,19.738800,-156.046005,47');
+        }
+        return new Response('', { status: 404 });
+    }) as typeof fetch;
+    try {
+        const result = await getFlightDataServer('UAL1759');
+        assert.equal(result.dataSources.schedule, 'aviationstack');
+        assert.ok(urls.some(url => url.endsWith('/airports/schema-01/P/PH.csv')));
+        assert.deepEqual([result.departure.latitude, result.departure.longitude], [19.7388, -156.046005]);
+        assert.equal(result.departure.code, 'KOA');
+        assert.equal(result.departure.airport, 'Kona International Airport');
+        assert.equal(result.dataSources.route, 'aviationstack');
+        assert.ok(result.dataQuality.warnings.includes('Airport locations come from reference data. Trip details come from AviationStack.'));
+        const unknown = await getFlightDataServer('UAL1760');
+        assert.deepEqual([unknown.departure.latitude, unknown.departure.longitude], [null, null]);
+        assert.equal(unknown.departure.code, 'XXX');
+        assert.equal(unknown.dataQuality.warnings.includes('Airport locations come from reference data. Trip details come from AviationStack.'), false);
     } finally { globalThis.fetch = before; setEnv('DATA_SOURCE', undefined); setEnv('AVIATION_STACK_KEY', undefined); }
 });
 

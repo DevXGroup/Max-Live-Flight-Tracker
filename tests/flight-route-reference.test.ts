@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getRouteAirportCodes, parseReferenceAirport, isReferenceRoutePlausible } from '../src/lib/flight-route-reference';
+import { getReferenceAirport, getRouteAirportCodes, parseReferenceAirport, isReferenceRoutePlausible } from '../src/lib/flight-route-reference';
 
 const header = 'Callsign,Code,Number,AirlineCode,AirportCodes\n';
 const airportHeader = 'Code,Name,ICAO,IATA,Location,CountryISO2,Latitude,Longitude,AltitudeFeet\n';
@@ -23,6 +23,21 @@ test('airport CSV supports quoted names, zero coordinates and ICAO-only airports
     assert.deepEqual(parseReferenceAirport(csv, 'TEST'), { airport: 'Test, Airport', code: 'TEST', latitude: 0, longitude: 0 });
     assert.equal(parseReferenceAirport(airportHeader + 'TEST,Test,TEST,,,ZZ,,0,0', 'TEST'), null);
     assert.equal(parseReferenceAirport(airportHeader + 'TEST,Test,TEST,,,ZZ,91,0,0', 'TEST'), null);
+});
+
+test('pinned standing-airport lookup accepts a validated ICAO and returns its coordinates', async () => {
+    const before = globalThis.fetch;
+    const csv = airportHeader + 'KOA,Kona International Airport,PHKO,KOA,Kailua-Kona,US,19.7388,-156.0456,47';
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+        assert.match(String(input), /airports\/schema-01\/P\/PH\.csv$/);
+        return new Response(csv, { status: 200 });
+    }) as typeof fetch;
+    try {
+        assert.deepEqual(await getReferenceAirport('PHKO'), {
+            airport: 'Kona International Airport', code: 'KOA', latitude: 19.7388, longitude: -156.0456,
+        });
+        assert.equal(await getReferenceAirport('../PHKO'), null);
+    } finally { globalThis.fetch = before; }
 });
 
 test('a geographically conflicting reference is suppressed, not shown as a current route', () => {

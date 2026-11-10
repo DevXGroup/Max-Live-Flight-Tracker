@@ -47,6 +47,17 @@ export function parseReferenceAirport(csv: string, code: string): Partial<Flight
     return { airport: row[1] || null, code: row[3] || row[2] || code, latitude, longitude };
 }
 
+export async function getReferenceAirport(icao: string): Promise<Partial<FlightAirport> | null> {
+    if (!/^[A-Z]{4}$/.test(icao)) return null;
+    try {
+        const signal = AbortSignal.timeout(3000);
+        const file = await getCsv(`airports/schema-01/${icao[0]}/${icao.slice(0, 2)}.csv`, signal);
+        return file ? parseReferenceAirport(file, icao) : null;
+    } catch {
+        return null;
+    }
+}
+
 export function isReferenceRoutePlausible(
     departure: Partial<FlightAirport>, arrival: Partial<FlightAirport>, latitude: number, longitude: number
 ): boolean {

@@ -54,6 +54,35 @@ The UI preserves available data after a refresh failure and makes the failure vi
 
 No free, permission-cleared source was verified to supply every existing UI field worldwide. Preserving the UI means every field has a defined mapping and missing-data state, not a promise that providers always populate it.
 
+## Public-release checks, 2026-11-10
+
+The owner authorized production release and restoration of the existing project key.
+`AVIATION_STACK_KEY` was restored as a Production Secret and `DATA_SOURCE=hybrid`
+as Production configuration. No key was printed, written into code/browser config,
+or copied into the vault. The preserved project `.env.local` was the source used for
+the authorized transfer through CLI stdin. Local secret files were not uploaded;
+the deployment builds the exact pushed GitHub commit.
+
+Public testing exposed three narrow follow-ups. A uniquely matched completed flight
+can now remain available for 24 hours, with its actual service date and a notice for
+older completed records. Active/current/upcoming records still take precedence and
+ambiguous matches remain unresolved. A historical result is used only when there is
+no fresh current aircraft position. Its itinerary, date and Landed status are never
+attached to a current aircraft just because the callsign is reused. A reported Landed
+schedule is also ignored when it conflicts with a fresh airborne observation. The
+historical selection marker remains server-internal and is not added to public JSON.
+This is not a full historical search API.
+When a schedule airport lacks provider/local coordinates, its validated ICAO code
+can use the existing pinned CC0 airport dataset with bounded requests and caches.
+This supplies a missing route endpoint such as PHKO/KOA without inventing a plane
+position or changing the schedule's itinerary confidence. Expired arrival estimates
+do not produce a current Early/On Time badge.
+
+Route lines are endpoint-based guides, not a recorded trail of everywhere the plane
+has flown. Ground track rotates the airplane icon clockwise from north. Provider
+coverage and missing fields remain explicit; no claim of every flight/field worldwide
+is made. Exact release/CI and rendered verification are in `TEST-LEDGER.md`.
+
 ## Existing schedule key: real compatibility check
 
 A subsequent direct check confirmed the existing local AviationStack key works over

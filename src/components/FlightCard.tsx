@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { FlightStatus } from "@/lib/api";
 import { Plane, Clock, MapPin, ArrowRight, AlertTriangle, CheckCircle } from "lucide-react";
 
@@ -10,13 +11,22 @@ interface FlightCardProps {
 }
 
 export default function FlightCard({ flight, lastSuccessfulUpdate = null, refreshError = null }: FlightCardProps) {
+    const [now, setNow] = useState<number | null>(null);
+    useEffect(() => {
+        const updateNow = () => setNow(Date.now());
+        updateNow();
+        const timer = window.setInterval(updateNow, 60_000);
+        return () => window.clearInterval(timer);
+    }, []);
     const scheduledArrival = flight.arrival.scheduledTime;
     const estimatedArrival = flight.arrival.estimatedTime;
     const delayMinutes = isValidFlightDate(scheduledArrival) && isValidFlightDate(estimatedArrival)
         ? Math.round((Date.parse(estimatedArrival) - Date.parse(scheduledArrival)) / 60000)
         : null;
     const isDelayed = delayMinutes !== null && delayMinutes > 15;
-    const showDelay = delayMinutes !== null && !['Landed', 'Cancelled', 'Unknown'].includes(flight.status);
+    const showDelay = delayMinutes !== null && isValidFlightDate(estimatedArrival)
+        && now !== null && Date.parse(estimatedArrival) > now
+        && !['Landed', 'Cancelled', 'Unknown'].includes(flight.status);
     const delayText = showDelay
         ? delayMinutes < 0
             ? 'Early'
