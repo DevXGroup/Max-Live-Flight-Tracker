@@ -2,15 +2,15 @@
 
 Date: 2026-11-09, America/Los_Angeles. Repair base: `f3c87db1ac748d525c18a01d31844e6d83a08504`.
 Evidence below covers the local repair. It does not establish a production release.
-Verified repair commit: `391903962d4a929500157ac60e150f01a11b67fc`. The follow-up
+Verified repair commit: `0eb57006090371a1a21a0390e722c2554d4a15c9` (core implementation `391903962d4a929500157ac60e150f01a11b67fc`; follow-up changes only warning copy, evidence and documentation). The follow-up
 handoff commit changes this ledger only; the tested application source is unchanged.
 
 | Feature | How verified | Depth | Last-verified revision | Result |
 |---|---|---|---|---|
-| Flight lookup and stable JSON | Node contract, identity, freshness, cache, capacity, normalization, reference route and UI utility tests; local production build; SWA1781 and WN1781 live probes | Unit, integration and live observation | `391903962d4a929500157ac60e150f01a11b67fc` | PASS locally; 30 tests and final build passed |
-| Flight cards and map | Browser fixtures for unknown fields, valid zero coordinates, schedule-only, actual arrival, timezones, stale observation, 404, malformed JSON, retained card on failed refresh and blocked tiles | Desktop 1440px, mobile 375px; screenshots visually inspected | `391903962d4a929500157ac60e150f01a11b67fc` | Passed local checks; real SWA1781 tiles loaded without a map key |
-| Existing AviationStack key and real hybrid schedule | One direct HTTPS compatibility check and temporary local hybrid SWA/WN lookups, followed by real 375px/1440px renders and visual inspection | Real provider and built app; no request interception | Follow-up warning-copy diff; application logic unchanged from verified repair | HTTP 200; Landed, gates, terminal and aircraft details populated; missing telemetry stayed null; production key restoration remains gated |
-| ship-gate flight provider repair | Security checklist, secrets/history/browser artifacts, live local port probe, data license and disclosure review, responsive renders, independent subscription review | Five lanes scoped to repair | `391903962d4a929500157ac60e150f01a11b67fc` | PASS for scoped local repair; no open confirmed release finding |
+| Flight lookup and stable JSON | Node contract, identity, freshness, cache, capacity, normalization, reference route and UI utility tests; local production build; SWA1781 and WN1781 live probes | Unit, integration and live observation | `0eb57006090371a1a21a0390e722c2554d4a15c9` | PASS locally; 30 tests and final build passed |
+| Flight cards and map | Browser fixtures for unknown fields, valid zero coordinates, schedule-only, actual arrival, timezones, stale observation, 404, malformed JSON, retained card on failed refresh and blocked tiles | Desktop 1440px, mobile 375px; screenshots visually inspected | `0eb57006090371a1a21a0390e722c2554d4a15c9` | Passed local checks; real SWA1781 tiles loaded without a map key |
+| Existing AviationStack key and real hybrid schedule | One direct HTTPS compatibility check and temporary local hybrid SWA/WN lookups, followed by real 375px/1440px renders and visual inspection | Real provider and built app; no request interception | `0eb57006090371a1a21a0390e722c2554d4a15c9` | HTTP 200; Landed, gates, terminal and aircraft details populated; missing telemetry stayed null; production key restoration remains gated |
+| ship-gate flight provider repair | Security checklist, secrets/history/browser artifacts, live local port probe, data license and disclosure review, responsive renders, independent subscription review | Five lanes scoped to repair | `0eb57006090371a1a21a0390e722c2554d4a15c9` | PASS for scoped local repair; no open confirmed release finding |
 | Vercel configuration and history | Authenticated CLI/API project metadata, variable counts, deployment metadata, runtime logs, paged environment activity | Read-only live control plane | Production inspected independently of local diff | Access works; no login needed; zero flight project variables; no evidence identifying a deletion actor |
 
 ## Local verification evidence
@@ -24,6 +24,7 @@ handoff commit changes this ledger only; the tested application source is unchan
 - Malformed/missing/script/traversal-like flight queries returned safe JSON 400. `/.env.local` returned 404. The local server bound 127.0.0.1:3013 and did not answer at the LAN address.
 - Gitleaks 8.30.1 full reachable history and current source packet: zero findings. Final 3,436,621-byte staged patch scan completed with zero findings before the repair commit. Exact local credential-value comparisons against the final build's 13 browser artifacts found zero matches for all three local provider secrets; values were never printed.
 - Production dependency audit: zero vulnerabilities. Full audit: seven moderate development-only TypeScript ESLint/minimatch advisories, tracked in `BACKLOG.md`; no forced incompatible override.
+- The follow-up real-provider evidence/warning-copy staged patch (780,198 bytes) also passed Gitleaks with zero findings. Exact comparison against the rebuilt 13 browser artifacts again found no local credential values.
 
 ## Independent review
 
