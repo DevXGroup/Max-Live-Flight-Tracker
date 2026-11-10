@@ -1,0 +1,53 @@
+{
+  "title": "Flight data without guesswork",
+  "subtitle": "Validate identity, show fresh data, mark gaps",
+  "width": 1600,
+  "footer": "Live Flight Tracker · DevX Group LLC",
+  "lanes": [
+    {
+      "label": "Search + UI",
+      "color": "blue",
+      "nodes": [
+        { "id": "search", "label": "Flight search", "icon": "magnifying-glass", "caption": "user enters flight" },
+        { "id": "validate", "kind": "box", "label": "Check flight number", "icon": "shield-check", "caption": "server keeps keys private", "col": 1 }
+      ],
+      "edges": [
+        { "from": "search", "to": "validate", "label": "checks input" }
+      ]
+    },
+    {
+      "label": "Live position",
+      "color": "green",
+      "nodes": [
+        { "id": "adsb", "kind": "box", "label": "adsb.lol", "icon": "globe", "caption": "live aircraft data" },
+        { "id": "fresh", "kind": "box", "label": "Check identity", "icon": "seal-check", "caption": "match fresh callsign", "col": 1 },
+        { "id": "position", "kind": "box", "label": "Position result", "icon": "target", "caption": "only verified match", "col": 2 }
+      ],
+      "edges": [
+        { "from": "adsb", "to": "fresh", "label": "finds aircraft" },
+        { "from": "fresh", "to": "position", "label": "keeps fresh match" }
+      ]
+    },
+    {
+      "label": "Route + schedule",
+      "color": "brown",
+      "nodes": [
+        { "id": "vrs", "kind": "box", "label": "VRS reference", "icon": "database", "caption": "CC0 callsign data", "row": 0 },
+        { "id": "vrscheck", "kind": "box", "label": "Match identity", "icon": "seal-check", "caption": "reference only", "col": 1, "row": 0 },
+        { "id": "aviation", "kind": "box", "label": "AviationStack", "icon": "calendar-check", "caption": "optional schedule", "col": 2, "row": 0 },
+        { "id": "json", "kind": "box", "label": "Stable JSON", "icon": "code", "caption": "one checked shape", "col": 3, "row": 1 },
+        { "id": "gaps", "label": "Show missing fields", "icon": "list-checks", "caption": "never guess values", "col": 4, "row": 1 }
+      ],
+      "edges": [
+        { "from": "vrs", "to": "vrscheck", "label": "adds reference" },
+        { "from": "vrscheck", "to": "json", "label": "adds reference if safe", "route": "vh" },
+        { "from": "aviation", "to": "json", "label": "adds schedule if set", "route": "hv" },
+        { "from": "json", "to": "gaps", "label": "marks unknowns" }
+      ]
+    }
+  ],
+  "cross_lane_edges": [
+    { "from": "validate", "to": "adsb", "label": "looks up position" },
+    { "from": "position", "to": "vrs", "label": "adds route details" }
+  ]
+}

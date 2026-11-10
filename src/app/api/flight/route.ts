@@ -1,33 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFlightData } from '@/lib/api';
+import { FlightLookupError } from '@/lib/flight-types';
+import { getFlightDataServer } from '@/lib/flight-server';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
-    const searchParams = request.nextUrl.searchParams;
-    const flightNumber = searchParams.get('flightNumber');
-
-    if (!flightNumber) {
-        return NextResponse.json({ error: 'Flight number is required' }, { status: 400 });
-    }
-
+    const flightNumber = request.nextUrl.searchParams.get('flightNumber') ?? '';
     try {
-        console.log(`🌐 [API Route] Incoming request for flight: ${flightNumber}`);
-        const data = await getFlightData(flightNumber);
-
-        if (!data) {
-            console.log(`ℹ️ [API Route] No data found for flight: ${flightNumber}`);
-            // Return 200 with an error object instead of 404 to avoid scary red console errors
-            // The client will handle the null data/error message
-            return NextResponse.json({
-                error: `Flight ${flightNumber} not found or currently inactive.`,
-                notFound: true
-            }, { status: 200 });
-        }
-
-        console.log(`✅ [API Route] Returning data for flight: ${flightNumber}`);
-        return NextResponse.json(data);
+        const data = await getFlightDataServer(flightNumber);
+        return NextResponse.json(data, { headers: { 'Cache-Control': 'private, no-store' } });
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'An error occurred while fetching flight data.';
-        console.error('[API Route] Error:', errorMessage);
-        return NextResponse.json({ error: errorMessage }, { status: 500 });
+        if (error instanceof FlightLookupError) {
+            const status = error.code === 'INVALID_FLIGHT' ? 400 : error.code === 'NOT_OBSERVED' ? 404 : 503;
+            return NextResponse.json({ error: error.message, code: error.code }, { status, headers: { 'Cache-Control': 'private, no-store' } });
+        }
+        return NextResponse.json({ error: 'Flight lookup failed. Please try again.' }, { status: 503, headers: { 'Cache-Control': 'private, no-store' } });
     }
 }

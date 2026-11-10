@@ -1,3 +1,7 @@
+> Historical feature snapshot. For current supported data sources, nullable fields and
+> verification, read [the flight data contract](docs/FLIGHT-DATA-CONTRACT.md).
+> The Amadeus setup instructions below are retired and must not be followed.
+
 # Live Flight Tracker - Complete Feature Summary
 
 ## 🎉 **Production-Ready Flight Tracker**

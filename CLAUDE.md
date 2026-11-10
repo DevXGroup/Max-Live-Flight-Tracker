@@ -11,8 +11,9 @@ Next.js app that tracks a single flight live on a map. See `BRIEF.md` for the fu
 
 - Next.js 16 App Router, React 19, TypeScript, Tailwind v4
 - Maps: `react-leaflet` (2D) and `react-globe.gl` / `three` (3D globe)
-- Data: OpenSky Network (live position, no key), AviationStack + Amadeus (route/schedule
-  metadata, optional keys), FlightAware (scraping fallback, no key)
+- Data: adsb.lol live observations (ODbL), pinned VRS CC0 route references, optional
+  permitted AviationStack operational enrichment. See `docs/FLIGHT-DATA-CONTRACT.md`.
+  Amadeus Self-Service and FlightAware scraping are disconnected historical integrations.
 - `framer-motion` for animation
 
 ## Run / build
@@ -20,6 +21,9 @@ Next.js app that tracks a single flight live on a map. See `BRIEF.md` for the fu
 - `npm run dev`, local dev server
 - `npm run build`, production build
 - `npm run lint`, ESLint
+- `npm test`, provider and contract regressions
+- Before push: test, lint, build, production dependency audit and ship-gate. Pushing main
+  can update the public Vercel site, so obtain production-release approval first.
 
 ## Hard rules
 

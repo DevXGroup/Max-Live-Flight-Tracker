@@ -1,4 +1,9 @@
-import { FlightStatus } from './api';
+import type { FlightStatus } from './flight-types';
+
+// Historical scraper shape. Not used by the supported flight API; retained for reference.
+type LegacyFlightStatus = Omit<FlightStatus, 'arrival' | 'dataSources' | 'dataQuality'> & {
+    arrival: Omit<FlightStatus['arrival'], 'actualTime'>;
+};
 import { getAirportCoords } from './airports';
 import https from 'https';
 
@@ -14,7 +19,7 @@ const IATA_TO_ICAO: Record<string, string> = {
     'MQ': 'ENY', 'OO': 'SKW', 'QK': 'JZA'
 };
 
-export async function scrapeFlightAware(flightNumber: string): Promise<FlightStatus | null> {
+export async function scrapeFlightAware(flightNumber: string): Promise<LegacyFlightStatus | null> {
     const matchCarrier = flightNumber.toUpperCase().match(/^([A-Z]{2,3})(\d+)$/);
     let fetchId = flightNumber.toUpperCase();
     
@@ -120,7 +125,7 @@ export async function scrapeFlightAware(flightNumber: string): Promise<FlightSta
                         }
                     }
 
-                    const result: FlightStatus = {
+                    const result: LegacyFlightStatus = {
                         flightNumber: flightNumber,
                         flightDate: now.toISOString().split('T')[0],
                         airline: f.airline?.shortName || f.airline?.fullName || 'Unknown',

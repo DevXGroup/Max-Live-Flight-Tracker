@@ -11,10 +11,10 @@ status: paused
 ## What this is
 
 A web app where you type in a flight number (like "BA36") and see that flight tracked live
-on an interactive map: its current position, speed, altitude, heading, and a countdown to
-arrival. It pulls real aircraft position data from the OpenSky Network and route/schedule
-data from AviationStack, Amadeus, and a FlightAware scraping fallback, then stitches it
-together with a local airport-coordinate database.
+on an interactive map: available position, speed, altitude, direction and trip details.
+The repair uses adsb.lol observations and pinned CC0 route references, with an optional
+eligible AviationStack schedule source. Missing fields remain unavailable. Reference
+routes are unconfirmed and never used to invent a schedule or arrival time.
 
 ## Who it is for
 
@@ -33,23 +33,32 @@ clean map and free data sources, no account or paywall.
 Not a product. No pricing, checkout, or monetization anywhere in the code. It's a free
 DevX Group side project.
 
-## Where things stand (2026-09-02)
+## Where things stand (2026-11-09)
 
-**Live and actively maintained: deployed at `flight.devxgroup.io` (verified 200 response),
-last commit 2026-08-25, working tree clean.** The app has been through several rounds of
-real bug fixes (CORS, rate limiting, timezone math, geodesic map paths, credential exposure)
-rather than sitting untouched. `.env.local` holds live API keys and is correctly gitignored
-(not tracked in git).
+The live site has an unreliable legacy lookup and a separate map-tile failure: CARTO's
+old keyless tile URL renders API KEY REQUIRED images. Production has no configured flight API
+variables, Amadeus Self-Service is deprecated, and FlightAware scraping returned 402.
+Available Vercel environment activity records do not identify who cleared keys or whether
+they were ever configured. Local credential files were preserved without exposing values.
+
+A replacement is verified locally: adsb.lol observations, pinned CC0 VRS route
+references labeled unconfirmed, explicit nullable schedule fields, source/freshness
+metadata, and null-safe cards/maps. The UI layout is preserved. No free source was
+verified to provide complete worldwide schedules, gates, terminals and telemetry together.
+See `docs/FLIGHT-DATA-CONTRACT.md` and `docs/TEST-LEDGER.md` for the final verification
+and deployment state. Production has not been changed by this repair yet.
 
 ## What happens next, in order
 
-1. Confirm the FlightAware key/scraper usage is not metered or rate-limited in a way that
-   could produce a surprise bill (see `BACKLOG.md`).
-2. Decide whether this stays a free public tool indefinitely or gets folded into a bigger
-   DevX aviation feature.
-3. If it stays public long-term, add basic uptime/error monitoring since it currently has
-   none.
-4. See `BACKLOG.md` for the full open item list.
+1. Obtain approval before pushing the tested production release. Local checks and
+   independent reviews pass; see `docs/TEST-LEDGER.md`. The public alias still serves
+   the old deployment until the approved push and release verification complete.
+2. After an approved push, wait for GitHub Actions on that exact commit and verify the
+   Vercel alias serves it, including live and missing-data lookup behavior.
+3. Add basic alerting for provider failures and consider a permission-cleared independent
+   fallback. FlyItalyADSB Free requires separate account/key onboarding; no account was
+   created and no spend or outbound provider contact was authorized by this repair.
+4. See `BACKLOG.md` for the remaining product and monitoring decisions.
 
 ## Map
 
@@ -59,8 +68,8 @@ rather than sitting untouched. `.env.local` holds live API keys and is correctly
 | How to run it locally | `README.md` |
 | Full feature list (as of last major update) | `FEATURES.md` |
 | Main page / search UI | `src/app/page.tsx` |
-| Flight data fetching + fallback chain | `src/lib/api.ts` |
-| OpenSky live position API | `src/lib/opensky.ts` |
-| FlightAware scraping fallback | `src/lib/flightaware.ts` |
+| Client wrapper / provider orchestration | `src/lib/api.ts` / `src/lib/flight-server.ts` |
+| Stable provider-to-UI contract | `src/lib/flight-types.ts` / `docs/FLIGHT-DATA-CONTRACT.md` |
+| Pinned reference route adapter | `src/lib/flight-route-reference.ts` |
 | Airport coordinate database | `src/lib/airports.ts` |
 | API route (server-side, keeps keys off the client) | `src/app/api/flight/route.ts` |

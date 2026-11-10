@@ -8,7 +8,9 @@ Read in this order: `BRIEF.md`, `BACKLOG.md`, `CLAUDE.md`.
 
 - `npm run dev`, local dev server
 - `npm run build`, production build
-- `npm run lint`, ESLint (no separate test suite exists)
+- `npm run lint`, ESLint
+- `npm test`, provider/contract regressions
+- `docs/FLIGHT-DATA-CONTRACT.md` owns current providers, mappings and missing-data behavior
 
 ## Rules that actually bite
 
@@ -33,3 +35,13 @@ Read in this order: `BRIEF.md`, `BACKLOG.md`, `CLAUDE.md`.
   Regenerate from sources; don't hand-edit output. HTML motion is optional and
   respects reduced-motion; PNG and print stay static.
 <!-- END POWERKIT: VISUAL DOCUMENTATION -->
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

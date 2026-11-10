@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": ".tmp/test-build",
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "include": [
+    "src/lib/flight-types.ts",
+    "src/lib/flight-normalize.ts",
+    "src/lib/airports.ts",
+    "src/lib/flight-route-reference.ts",
+    "src/lib/flight-server.ts",
+    "tests/**/*.test.ts"
+  ]
+}

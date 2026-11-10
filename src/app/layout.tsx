@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Live Flight Tracker | Real-Time Global Flight Tracking - DevXGroup",
-  description: "Track any flight in real-time with our advanced 3D interactive globe. Get accurate status updates, arrival times, and global aviation coverage. Powered by DevXGroup.",
+  title: "Live Flight Tracker - DevX Group",
+  description: "Look up a flight to see available aircraft position and trip details on a map. Data coverage and details vary by source.",
   keywords: ["flight tracker", "live flight tracking", "real-time flights", "flight status", "airplane tracker", "DevXGroup", "aviation tracking", "flight radar", "flight path"],
   authors: [{ name: "DevXGroup LLC", url: "https://devxgroup.io" }],
   creator: "DevXGroup LLC",
@@ -25,8 +25,8 @@ export const metadata: Metadata = {
   },
   applicationName: "Live Flight Tracker",
   openGraph: {
-    title: "Live Flight Tracker - Real-Time Global Flight Tracking",
-    description: "Track flights in real-time with interactive 3D globe visualization. Advanced aviation tracking by DevXGroup.",
+    title: "Live Flight Tracker - DevX Group",
+    description: "Look up a flight to see available aircraft position and trip details on a map. Data coverage and details vary by source.",
     url: "https://flight.devxgroup.io",
     type: "website",
     siteName: "Live Flight Tracker",
@@ -41,8 +41,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Live Flight Tracker - Real-Time Flight Tracking",
-    description: "Track flights in real-time with interactive 3D globe visualization. Powered by DevXGroup.",
+    title: "Live Flight Tracker - DevX Group",
+    description: "Look up a flight to see available aircraft position and trip details on a map. Data coverage and details vary by source.",
     creator: "@devxgroup",
     images: ["/icon.png"],
   },

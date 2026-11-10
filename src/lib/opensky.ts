@@ -41,9 +41,8 @@ async function fetchAllStates(): Promise<OpenSkyResponse> {
 
     console.log('📡 [OpenSky] Fetching active aircraft states from states/all...');
     const response = await fetch('https://opensky-network.org/api/states/all', {
-        next: { revalidate: 0 },
         cache: 'no-store'
-    } as any);
+    });
 
     if (!response.ok) {
         if (response.status === 429) {

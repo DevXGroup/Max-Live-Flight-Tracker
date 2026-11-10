@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { FlightStatus, getFlightData } from '@/lib/api';
 import SearchBar from '@/components/SearchBar';
@@ -22,76 +22,131 @@ const FlightMap = dynamic(() => import('@/components/FlightMap'), {
 export default function Home() {
   const [flightData, setFlightData] = useState<FlightStatus | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [lastSuccessfulUpdate, setLastSuccessfulUpdate] = useState<Date | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const requestId = useRef(0);
+  const activeController = useRef<AbortController | null>(null);
+  const refreshInFlight = useRef(false);
 
+  const handleSearch = useCallback(async (flightNumber: string) => {
+    activeController.current?.abort();
+    activeController.current = null;
+    const thisRequest = ++requestId.current;
+    const controller = new AbortController();
+    activeController.current = controller;
+    let timedOut = false;
+    const timeout = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 20_000);
 
-  const handleSearch = async (flightNumber: string) => {
-    console.log('🚀 handleSearch called with:', flightNumber);
     setLoading(true);
     setError('');
+    setRefreshError(null);
+    setLastSuccessfulUpdate(null);
+    setIsRefreshing(false);
+    refreshInFlight.current = false;
     setFlightData(null);
 
     try {
-      console.log(`⏳ [Home] Searching for ${flightNumber}...`);
-      const data = await getFlightData(flightNumber);
-      console.log('📦 [Home] Received response:', data ? 'Valid Data' : 'Not Found');
+      const data = await getFlightData(flightNumber, controller.signal);
+      if (thisRequest !== requestId.current) return;
 
       if (data) {
         setFlightData(data);
-        setSearchQuery(flightNumber); // Remember the successful search query
-        setLastUpdate(new Date());
+        setSearchQuery(flightNumber);
+        setLastSuccessfulUpdate(new Date());
       } else {
-        setError('Flight not found. Try "AA123", "BA249", or "LH400".');
+        setError('No flight data is available for that search. Check the flight number and try again.');
       }
     } catch (err) {
-      console.error('💥 [Home] Error in handleSearch:', err);
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred while fetching flight data.';
+      if (thisRequest !== requestId.current) return;
+      const errorMessage = timedOut
+        ? 'The flight lookup took too long. Please try again.'
+        : err instanceof Error
+          ? err.message
+          : 'The flight lookup failed. Please try again.';
       setError(errorMessage);
     } finally {
-      console.log('🏁 Search complete, setting loading to false');
-      setLoading(false);
+      window.clearTimeout(timeout);
+      if (thisRequest === requestId.current) {
+        activeController.current = null;
+        setLoading(false);
+      }
     }
-  };
+  }, []);
 
-  const handleRefresh = async () => {
-    if (!flightData || !searchQuery) return;
+  const handleRefresh = useCallback(async () => {
+    if (!flightData || !searchQuery || isRefreshing || refreshInFlight.current) return;
 
-    console.log('🔄 Refreshing flight data using query:', searchQuery);
+    activeController.current?.abort();
+    activeController.current = null;
+    const thisRequest = ++requestId.current;
+    const controller = new AbortController();
+    activeController.current = controller;
+    let timedOut = false;
+    const timeout = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 20_000);
+
+    setIsRefreshing(true);
+    refreshInFlight.current = true;
+
     try {
-      const data = await getFlightData(searchQuery);
+      const data = await getFlightData(searchQuery, controller.signal);
+      if (thisRequest !== requestId.current) return;
+
       if (data) {
         setFlightData(data);
-        setLastUpdate(new Date());
-        console.log('✅ Flight data refreshed');
+        setLastSuccessfulUpdate(new Date());
+        setRefreshError(null);
+      } else {
+        setRefreshError('No new flight data was returned.');
       }
     } catch (err) {
-      console.error('❌ Error refreshing:', err);
+      if (thisRequest !== requestId.current) return;
+      setRefreshError(timedOut
+        ? 'The update took too long.'
+        : err instanceof Error
+          ? err.message
+          : 'The update failed.');
+    } finally {
+      window.clearTimeout(timeout);
+      if (thisRequest === requestId.current) {
+        activeController.current = null;
+        refreshInFlight.current = false;
+        setIsRefreshing(false);
+      }
     }
-  };
+  }, [flightData, isRefreshing, searchQuery]);
 
-  // Auto-refresh every 30 seconds
   useEffect(() => {
-    if (!flightData) return;
+    if (!flightData || !searchQuery) return;
 
-    const interval = setInterval(() => {
-      console.log('⏰ Auto-refreshing flight data...');
-      handleRefresh();
-    }, 60000); // 60 seconds
+    const interval = window.setInterval(() => {
+      void handleRefresh();
+    }, 60_000);
 
-    return () => clearInterval(interval);
-  }, [flightData]);
+    return () => window.clearInterval(interval);
+  }, [flightData, handleRefresh, searchQuery]);
+
+  useEffect(() => () => {
+    activeController.current?.abort();
+    activeController.current = null;
+    requestId.current += 1;
+  }, []);
 
   return (
     <main className="min-h-screen bg-[#0f172a] text-slate-100 p-4 md:p-8 relative overflow-hidden">
       <InteractiveBackground />
-      {/* Background Elements */}
       <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-blue-900/20 to-transparent pointer-events-none" />
       <div className="absolute -top-[200px] -right-[200px] w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="max-w-6xl mx-auto relative z-10">
-        {/* Header */}
         <header className="flex flex-col items-center justify-center mb-12 pt-8">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 bg-blue-600 rounded-xl shadow-lg shadow-blue-600/20">
@@ -112,10 +167,10 @@ export default function Home() {
             </div>
           </div>
           <p className="text-slate-400 text-lg max-w-2xl text-center">
-            Real-time global flight tracking with live maps and accurate status updates.
+            Flight position and available trip details on an interactive map.
           </p>
-          <p className="text-slate-600 text-xs max-w-2xl text-center mt-2">
-            Powered by OpenSky Network & Amadeus APIs for the most accurate real-time data.
+          <p className="text-slate-500 text-sm max-w-2xl text-center mt-2">
+            Position and trip details depend on available flight data.
           </p>
         </header>
 
@@ -124,41 +179,42 @@ export default function Home() {
             <SearchBar onSearch={handleSearch} isLoading={loading} />
           </div>
 
-
           {error && (
-            <div className="text-center text-red-400 bg-red-900/20 py-2 px-4 rounded-lg border border-red-900/50 inline-block mx-auto w-full max-w-md animate-fade-in">
+            <div role="alert" className="text-center text-red-300 bg-red-900/20 py-2 px-4 rounded-lg border border-red-900/50 inline-block mx-auto w-full max-w-md animate-fade-in">
               {error}
             </div>
           )}
         </div>
 
-        {/* Results Section */}
         {flightData && (
           <div className="space-y-8 animate-fade-in">
-            <FlightCard flight={flightData} />
+            <FlightCard
+              flight={flightData}
+              lastSuccessfulUpdate={lastSuccessfulUpdate}
+              refreshError={refreshError}
+            />
             <FlightMap flight={flightData} onRefresh={handleRefresh} />
+            {isRefreshing && <p role="status" className="text-center text-sm text-slate-400">Updating flight data...</p>}
           </div>
         )}
 
-        {/* Empty State / Features */}
         {!flightData && !loading && !error && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16 opacity-50">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16 opacity-70">
             <div className="p-6 rounded-2xl bg-slate-800/30 border border-slate-700/50">
-              <h3 className="font-bold text-xl mb-2 text-slate-200">Live Tracking</h3>
-              <p className="text-slate-400">Real-time position updates on a global interactive map.</p>
+              <h3 className="font-bold text-xl mb-2 text-slate-200">Live position</h3>
+              <p className="text-slate-400">See a flight position when a data source has it.</p>
             </div>
             <div className="p-6 rounded-2xl bg-slate-800/30 border border-slate-700/50">
-              <h3 className="font-bold text-xl mb-2 text-slate-200">Accurate Data</h3>
-              <p className="text-slate-400">Precise arrival times, gate info, and delay notifications.</p>
+              <h3 className="font-bold text-xl mb-2 text-slate-200">Trip details</h3>
+              <p className="text-slate-400">Available schedule details appear with the flight.</p>
             </div>
             <div className="p-6 rounded-2xl bg-slate-800/30 border border-slate-700/50">
-              <h3 className="font-bold text-xl mb-2 text-slate-200">Global Coverage</h3>
-              <p className="text-slate-400">Track flights from any airline across the world.</p>
+              <h3 className="font-bold text-xl mb-2 text-slate-200">Provider coverage</h3>
+              <p className="text-slate-400">Coverage varies by flight and data source.</p>
             </div>
           </div>
         )}
 
-        {/* Branding Footer */}
         <footer className="mt-16 pb-8 text-center relative z-10">
           <div className="flex flex-col items-center gap-4">
             <a
@@ -169,13 +225,13 @@ export default function Home() {
             >
               <img
                 src="/devx-logo.png"
-                alt="DevXGroup LLC Logo"
+                alt="DevX Group LLC logo"
                 className="h-8 w-auto object-contain brightness-90 group-hover:brightness-110 group-hover:scale-105 transition-all"
               />
               <div className="text-left">
                 <p className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-semibold">Brought to you by</p>
-                <p className="font-bold text-slate-300 group-hover:text-blue-400 transition-colors tracking-tight">DevXGroup LLC</p>
-                <p className="text-[10px] text-slate-500">Premium Software Solutions</p>
+                <p className="font-bold text-slate-300 group-hover:text-blue-400 transition-colors tracking-tight">DevX Group LLC</p>
+                <p className="text-[10px] text-slate-500">Flight data sources are listed with each result</p>
               </div>
             </a>
             <div className="flex gap-6 mt-2">
@@ -183,11 +239,11 @@ export default function Home() {
               <a href="https://devxgroup.io/contact" className="text-xs text-slate-500 hover:text-blue-400 transition-colors">Contact Us</a>
               <a href="https://devxgroup.io/services" className="text-xs text-slate-500 hover:text-blue-400 transition-colors">Services</a>
             </div>
-            <div className="h-px w-32 bg-gradient-to-r from-transparent via-slate-800 to-transparent my-2"></div>
-            <p className="text-[10px] text-slate-600 uppercase tracking-widest">© {new Date().getFullYear()} DevXGroup LLC. All rights reserved.</p>
+            <a href="/data-and-privacy" className="inline-flex min-h-[44px] items-center px-3 text-xs text-slate-400 underline underline-offset-4 hover:text-blue-300 transition-colors">Data and privacy</a>
+            <div className="h-px w-32 bg-gradient-to-r from-transparent via-slate-800 to-transparent my-2" />
+            <p className="text-[10px] text-slate-600 uppercase tracking-widest">© {new Date().getFullYear()} DevX Group LLC. All rights reserved.</p>
           </div>
         </footer>
-
       </div>
     </main>
   );

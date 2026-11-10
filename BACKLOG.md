@@ -2,19 +2,32 @@
 project: max-live-flight-tracker
 name: Live Flight Tracker
 status: live
-updated: 2026-09-02
+updated: 2026-11-09
 health: needs-testing
+where_we_are: "Flight repair passes 30 tests, local build and independent reviews; production push awaits approval. See docs/TEST-LEDGER.md."
 todos:
-  - id: flightaware-key-audit
+  - id: flight-provider-repair-release
     priority: P1
-    title: "Confirm the FlightAware scraping fallback can't run up a bill or get blocked"
-    why: "src/lib/flightaware.ts scrapes FlightAware directly instead of calling a metered API, so there's no key to leak, but no one has confirmed the scraper is stable against FlightAware's site changing or blocking the IP. If it silently breaks, flight lookups quietly fall back to worse data with no alert."
-    where: "src/lib/flightaware.ts"
+    title: "Release the verified replacement flight data contract"
+    why: "The live site still uses the legacy dependency chain. Local ship-gate passed. Obtain production approval, then push and verify exact-commit CI, the Vercel alias, SWA/WN lookup and missing-data behavior. Never claim the local repair is deployed before that evidence exists."
+    where: "docs/TEST-LEDGER.md"
     owner: max
   - id: add-monitoring
     priority: P2
     title: "Add basic uptime or error monitoring for the live site"
-    why: "flight.devxgroup.io is public and returns 200 today, but there is no alerting if OpenSky/AviationStack/Amadeus all fail at once or the deploy breaks. Right now the only way to find out is a manual check."
+    why: "The public site needs a useful provider-error/lookup health alert beyond homepage availability. A green homepage does not prove fresh aircraft observations. Do not add tracking or paid monitoring without a scoped decision."
+    owner: max
+  - id: independent-free-fallback
+    priority: P2
+    title: "Evaluate a permission-cleared independent free observation fallback"
+    why: "FlyItalyADSB terms allow Free commercial use and server caching, but onboarding needs a separate account/key and current plan/license verification. No account, contact, spend or key change was performed. Default adsb.lol remains best effort; process-local caches are not a distributed quota guarantee."
+    where: "docs/research/2026-11-09-perplexity-flight-data.md"
+    owner: max
+  - id: dev-linter-minimatch-advisory
+    priority: P2
+    title: "Update the linter chain when a compatible minimatch fix is released"
+    why: "After non-forced compatible updates, npm audit reports seven moderate development-only advisories in the TypeScript ESLint/minimatch chain. The patched minimatch major is outside the current upstream dependency range. Production audit is clean. Do not force a toolchain override without testing and a scoped decision."
+    where: "package-lock.json"
     owner: max
   - id: decide-project-future
     priority: P3
@@ -42,11 +55,12 @@ context for humans and never repeats a to-do.
 
 ## Where things stand
 
-This project used to be flagged dormant and outside version control. That's no longer
-accurate: it has a real git history (30+ commits), a clean working tree, and is deployed
-live at `flight.devxgroup.io`, which returned a 200 on 2026-09-02. `health` is
-`needs-testing` rather than `green` because nothing here was verified beyond "the homepage
-loads", actual flight search and the API fallback chain were not exercised in this pass.
+The 2026-11-09 live audit confirmed missing production flight credentials, deprecated
+Amadeus Self-Service and unreliable scraping. No available audit record attributes a
+credential deletion to anyone. The replacement maps validated observations into the
+existing UI groups, preserves nulls, labels reference routes and records source age.
+Research, contract decisions and exact verification/release evidence are under `docs/`.
+Production remains a separate gate from local implementation and fixture tests.
 
 ## Rejected / not resurrected
 

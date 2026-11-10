@@ -50,6 +50,10 @@ body {
   background: #0f172a;
 }
 
+.flight-map-tiles {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.88);
+}
+
 .glass-panel {
   background: rgba(30, 41, 59, 0.7);
   backdrop-filter: blur(12px);
