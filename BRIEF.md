@@ -50,9 +50,12 @@ and deployment state. Production has not been changed by this repair yet.
 
 ## What happens next, in order
 
-1. Obtain approval before pushing the tested production release. Local checks and
-   independent reviews pass; see `docs/TEST-LEDGER.md`. The public alias still serves
-   the old deployment until the approved push and release verification complete.
+1. Obtain approval before pushing the tested production release. The existing local
+   AviationStack key now passes real schedule/UI checks, including SWA1781 as Landed
+   with gates and aircraft details. It is absent from production and the canonical
+   vault. Max must add the missing vault key per his rule, then approve server-only
+   restoration with `DATA_SOURCE=hybrid`. Local checks and independent reviews pass;
+   see `docs/TEST-LEDGER.md`. The public alias still serves the old deployment.
 2. After an approved push, wait for GitHub Actions on that exact commit and verify the
    Vercel alias serves it, including live and missing-data lookup behavior.
 3. Add basic alerting for provider failures and consider a permission-cleared independent

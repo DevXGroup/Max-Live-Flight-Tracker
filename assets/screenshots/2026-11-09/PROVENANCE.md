@@ -39,3 +39,12 @@ inspected after tiles and resize transitions settled. Interception was removed.
 Subsequent real SWA1781/WN1781 probes returned On Ground, then the source stopped
 providing a recent observation. A new search correctly returned NOT_OBSERVED rather
 than inventing a position, cancellation, gate arrival or completed schedule.
+
+`flight-hybrid-live-desktop.png` and `flight-hybrid-live-mobile.png` are subsequent real
+production-build renders with a temporary local hybrid process using the pre-existing
+local AviationStack key. They show provider-reported Landed, real schedule fields,
+gate/terminal, aircraft type/registration, no live telemetry and two airport markers.
+These are not intercepted fixtures and do not prove airline accuracy beyond the
+provider report. No key or passenger data is shown. Tiles and resize transitions were
+allowed to settle before the final mobile capture. Test polling/server were stopped
+after capture; no production setting was changed.

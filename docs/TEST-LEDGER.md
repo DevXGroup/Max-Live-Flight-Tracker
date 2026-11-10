@@ -9,6 +9,7 @@ handoff commit changes this ledger only; the tested application source is unchan
 |---|---|---|---|---|
 | Flight lookup and stable JSON | Node contract, identity, freshness, cache, capacity, normalization, reference route and UI utility tests; local production build; SWA1781 and WN1781 live probes | Unit, integration and live observation | `391903962d4a929500157ac60e150f01a11b67fc` | PASS locally; 30 tests and final build passed |
 | Flight cards and map | Browser fixtures for unknown fields, valid zero coordinates, schedule-only, actual arrival, timezones, stale observation, 404, malformed JSON, retained card on failed refresh and blocked tiles | Desktop 1440px, mobile 375px; screenshots visually inspected | `391903962d4a929500157ac60e150f01a11b67fc` | Passed local checks; real SWA1781 tiles loaded without a map key |
+| Existing AviationStack key and real hybrid schedule | One direct HTTPS compatibility check and temporary local hybrid SWA/WN lookups, followed by real 375px/1440px renders and visual inspection | Real provider and built app; no request interception | Follow-up warning-copy diff; application logic unchanged from verified repair | HTTP 200; Landed, gates, terminal and aircraft details populated; missing telemetry stayed null; production key restoration remains gated |
 | ship-gate flight provider repair | Security checklist, secrets/history/browser artifacts, live local port probe, data license and disclosure review, responsive renders, independent subscription review | Five lanes scoped to repair | `391903962d4a929500157ac60e150f01a11b67fc` | PASS for scoped local repair; no open confirmed release finding |
 | Vercel configuration and history | Authenticated CLI/API project metadata, variable counts, deployment metadata, runtime logs, paged environment activity | Read-only live control plane | Production inspected independently of local diff | Access works; no login needed; zero flight project variables; no evidence identifying a deletion actor |
 
@@ -18,6 +19,7 @@ handoff commit changes this ledger only; the tested application source is unchan
 - Real local production lookup returned HTTP 200 for SWA1781 and WN1781 with the same aircraft, adsb.lol position, and an unconfirmed VRS route. Missing schedule, gates, terminals and ETA stayed null. This proves those observations, not universal coverage.
 - Real map rendered OpenStreetMap tiles. Preserved screenshots and provenance are in `assets/screenshots/2026-11-09/`; before screenshots show the separate CARTO API KEY REQUIRED tile failure.
 - Browser fixtures passed missing-data and error paths listed in the table. Schedule fixtures are synthetic, not evidence that a free operational provider returned those details.
+- Subsequent real AviationStack checks confirmed the existing local key works. Temporary local hybrid mode returned SWA1781/WN1781 schedule-only data and provider-reported Landed, DEN gate C65, SAN terminal 1/gate 103, B38M and N9021F. Desktop/mobile real screenshots are separate from fixtures. This verifies actual compatibility, not plan tier/quota or airline-certified accuracy. The generic missing-position warning was shortened to avoid contradicting a Landed record; all 30 tests, targeted lint, TypeScript and build passed again. No functional logic changed after the final independent reviews.
 - The built diagnostic `/api/test` route returned safe JSON 404 / NOT_OBSERVED for its fixed flight lookup, confirming it calls the server lookup directly rather than producing the former relative-fetch 500. The public data-and-privacy page was rendered and visually inspected at 375px and 1440px with no horizontal overflow.
 - Malformed/missing/script/traversal-like flight queries returned safe JSON 400. `/.env.local` returned 404. The local server bound 127.0.0.1:3013 and did not answer at the LAN address.
 - Gitleaks 8.30.1 full reachable history and current source packet: zero findings. Final 3,436,621-byte staged patch scan completed with zero findings before the repair commit. Exact local credential-value comparisons against the final build's 13 browser artifacts found zero matches for all three local provider secrets; values were never printed.
@@ -70,3 +72,11 @@ Vercel's configured production branch is main, so pushing the repair may deploy 
 Obtain Max's production approval after local verification, then push and verify GitHub
 Actions for the exact commit and the Vercel public alias. Until then, the public site
 continues to serve the old deployment.
+
+Full trip enrichment release also requires `AVIATION_STACK_KEY` and
+`DATA_SOURCE=hybrid` in this project's Production environment. The existing local key
+is valid, but exact comparison against 57 canonical vault files found no copy. Max's
+supplied credential rule requires him to add missing vault keys; no credential was
+copied into the vault or Vercel. A specific owner request for vault addition and
+server-only restoration/deploy is pending. Local polling and the preview server were
+stopped after real-provider evidence was captured to avoid background quota use.

@@ -4,6 +4,16 @@
 
 ## Recommendation
 
+**Later compatibility check:** the existing local AviationStack key returned HTTP 200
+over HTTPS and real SWA1781/WN1781 schedule records. A temporary local hybrid build
+populated gate, terminal, actual times and aircraft fields and subsequently showed
+provider-reported Landed. The initial no-credential research below predates this check.
+Retaining AviationStack for optional trip details alongside adsb.lol observations now
+has real compatibility evidence; a new provider is not required solely to fix the JSON
+mapping. The account's plan/quota and airline accuracy were not independently verified.
+The key is absent from production and the canonical vault, so owner credential handling
+and production approval remain required. See the contract and verification ledger.
+
 For a public/commercial tracker, do not rely on OpenSky or adsb.fi without written commercial/operational permission. OpenSky's current terms require a written license for any for-profit use and for operational REST API use in a live product; its data also does not include airline schedules, cancellations, delays, or passenger schedule data. adsb.fi explicitly limits public open-data access to personal, non-commercial use and asks that its source be cited and linked.
 
 For the no-key position layer to evaluate first, test adsb.lol: its own API docs say the API is free and public, its public API/data are under ODbL 1.0, and it asks production users to contact the operator so the service is not disrupted. The precise commercial redistribution obligations under ODbL and the live service's acceptable-use expectations require review before shipping. Keep the ADS-B adapter replaceable and cache results, rate-limit centrally, and avoid calling every source on every page refresh.

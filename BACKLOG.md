@@ -4,12 +4,12 @@ name: Live Flight Tracker
 status: live
 updated: 2026-11-09
 health: needs-testing
-where_we_are: "Flight repair passes 30 tests, local build and independent reviews; production push awaits approval. See docs/TEST-LEDGER.md."
+where_we_are: "Flight repair passes 30 tests and reviews; real AviationStack/SWA1781 UI works locally. Vault key addition and production restore/deploy await owner. See docs/TEST-LEDGER.md."
 todos:
   - id: flight-provider-repair-release
     priority: P1
     title: "Release the verified replacement flight data contract"
-    why: "The live site still uses the legacy dependency chain. Local ship-gate passed. Obtain production approval, then push and verify exact-commit CI, the Vercel alias, SWA/WN lookup and missing-data behavior. Never claim the local repair is deployed before that evidence exists."
+    why: "The live site still uses the legacy dependency chain. Local ship-gate and real hybrid schedule/UI checks passed. The existing local AviationStack key is valid but absent from Vercel and the canonical vault. Owner must add the vault key and approve server-only key restoration/DATA_SOURCE=hybrid plus deployment. Then verify exact-commit CI, Vercel alias, SWA/WN lookup and missing-data behavior. No new plan or quota change was made."
     where: "docs/TEST-LEDGER.md"
     owner: max
   - id: add-monitoring

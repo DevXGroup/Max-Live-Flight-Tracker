@@ -54,6 +54,27 @@ The UI preserves available data after a refresh failure and makes the failure vi
 
 No free, permission-cleared source was verified to supply every existing UI field worldwide. Preserving the UI means every field has a defined mapping and missing-data state, not a promise that providers always populate it.
 
+## Existing schedule key: real compatibility check
+
+A subsequent direct check confirmed the existing local AviationStack key works over
+HTTPS. With a temporary local `DATA_SOURCE=hybrid` process, both SWA1781 and WN1781
+returned dated schedule-only results after recent ADS-B coverage stopped. The real
+response populated DEN gate C65, SAN terminal 1/gate 103, aircraft B38M and registration
+N9021F. Provider status changed from Delayed to Landed between probes. The adapter
+preserved supplied timestamps and displayed them in airport timezones, left missing
+telemetry null, and drew airport markers without a fabricated aircraft position.
+
+This proves current key validity and actual JSON/UI compatibility for those responses,
+not all-airline completeness, a free account tier, remaining quota or independently
+confirmed airline accuracy. Provider times/status may lag or contain errors; no offset
+was silently changed to make the result look right. No new account or plan was purchased.
+Local test polling was stopped after capture to avoid continued schedule API usage.
+
+Production still has no key or hybrid setting. The key was not found in the canonical
+vault. The owner's supplied rule requires them to add missing vault keys before
+credential restoration; no key was copied, stored or printed by this repair. Deployment
+and restoration of `AVIATION_STACK_KEY` plus `DATA_SOURCE=hybrid` require approval.
+
 ## Diagram source and rendering
 
 The visual overview is generated from [`diagrams/flight-data-flow.json`](diagrams/flight-data-flow.json) with the shared [clean-diagram renderer](../../../claude-code-powerkit/skills/clean-diagram/render.py). The HTML and PNG beside the JSON are generated outputs; change the JSON and render again rather than editing those outputs.

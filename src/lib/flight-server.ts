@@ -290,7 +290,7 @@ async function lookup(flightNumber: string): Promise<FlightStatus> {
     } else if (!flight.dataSources.route) {
         flight.dataQuality.warnings.push('No verified current schedule is available; schedule times, gate, terminal, and route may be missing.');
     }
-    if (!position && schedule) flight.dataQuality.warnings.push('No recent aircraft position is available; this flight may still be scheduled or operating.');
+    if (!position && schedule) flight.dataQuality.warnings.push('No recent aircraft position is available for this flight.');
     flight.dataQuality.missingFields = missingFlightFields(flight);
     return flight;
 }
