@@ -35,37 +35,34 @@ DevX Group side project.
 
 ## Where things stand (2026-11-10)
 
-The replacement is pushed to `main` at `0fd784019ee12633706cbea77bcc36b663d65fd4`.
-It uses adsb.lol observations, pinned CC0 VRS route references labeled unconfirmed,
-explicit nullable schedule fields, source/freshness metadata, and null-safe cards/maps.
-Real local hybrid checks confirmed AviationStack schedule details when available; missing
-position telemetry remains null.
+The replacement is live at `flight.devxgroup.io` from
+`dfc43013c499ff3faa9860967ce725ee1959fa6a`. It uses adsb.lol live observations, optional
+AviationStack schedule enrichment, and pinned CC0 VRS reference data for unconfirmed
+routes and missing airport coordinates. Missing telemetry stays null.
 
-At Max's explicit release request, Production received server-side `AVIATION_STACK_KEY`
-and `DATA_SOURCE=hybrid` configuration. No secret value was written to this repository
-or the PowerKit vault. Commit `0fd784019ee12633706cbea77bcc36b663d65fd4` is deployed and
-the exact-SHA GitHub Actions workflow passed. A public UAL1759 lookup returned HTTP 200
-with an active ADS-B position and schedule data. A current SWA1781/WN1781 lookup returned
-404 even though AviationStack had a completed record from the previous day. The selector
-had stopped considering completed flights after six hours. A narrow local hotfix now
-extends that lookup window to 24 hours, warns when the completed record is older than six
-hours, and preserves ambiguity safeguards. The same hotfix adds missing airport coordinates
-from the pinned reference airport CSV using the schedule's validated ICAO code, and hides
-expired Early/On Time badges. The hotfix has not been deployed yet.
-See `docs/TEST-LEDGER.md` for the release and hotfix evidence.
+Exact-SHA GitHub Actions run `42808268369` passed install, tests, lint, and build. Vercel
+deployment `dpl_jcPSn5UEfG6piVd5UNQautposn6S` is Ready and Promoted. Public checks confirmed
+SWA1781 and WN1781 as completed November 9 flights with gate 103 and terminal 1; UAL1759
+is Active with a live route from KOA to DEN. KOA coordinates resolve from pinned reference
+airport data. Expired ETAs show no Early badge, and old schedule data is not merged with
+a fresh live position. These checks do not establish complete coverage for every flight.
+See `docs/TEST-LEDGER.md` and screenshot provenance for the evidence.
+
+Production uses server-side `AVIATION_STACK_KEY` and `DATA_SOURCE=hybrid`. No secret value
+was written to the repository or the PowerKit vault. No database write, billing-plan
+change, or new provider account was made. Follow the credential-vault rule for future key
+management.
 
 ## What happens next, in order
 
-1. Finish local verification and independent review of the history, airport-coordinate
-   and expired-estimate hotfixes. Then release them and verify SWA1781/WN1781 completed
-   schedule data, UAL1759 map endpoints, expired ETA badge, and missing-position behavior.
-2. Follow Max's credential-vault rule for future key management: the Production value
-   was restored through the authorized Vercel configuration path, but no copy was added
-   to the PowerKit vault. Do not print or copy the value.
-3. Add basic alerting for provider failures and consider a permission-cleared independent
+1. Add basic alerting for provider failures and consider a permission-cleared independent
    fallback. FlyItalyADSB Free requires separate account/key onboarding; no account was
    created and no spend or outbound provider contact was authorized by this repair.
-4. See `BACKLOG.md` for the remaining product and monitoring decisions.
+2. Follow Max's credential-vault rule for future key management: the Production value is
+   configured through the authorized Vercel path, but no copy was added to the PowerKit
+   vault. Record it in the vault through Max's approved process; never print or copy it.
+3. Update the linter dependency chain when a compatible minimatch fix is available, then
+   decide whether this remains a standalone free tool. See `BACKLOG.md`.
 
 ## Map
 

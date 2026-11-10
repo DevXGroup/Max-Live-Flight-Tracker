@@ -49,3 +49,21 @@ representation or international-transfer arrangements for the company as a whole
 ## Remaining operational limits
 
 No eligible free source was verified to provide every airline schedule field globally. Provider outages and receiver coverage gaps remain possible. Production alerting and an independent permitted fallback remain backlog work. The owner must approve the production release; local tests do not establish that the public alias has updated.
+
+## Authorized production release, 2026-11-10
+
+The owner subsequently requested publishing the repair with API connectivity. The
+existing project AviationStack key was transferred in memory through authenticated
+CLI stdin into this project's Production Secret. `DATA_SOURCE=hybrid` is Production
+configuration. Neither local secret files nor vault files were changed or uploaded.
+The deployment was built from the exact pushed GitHub commit, not local scratch.
+
+The follow-up release uses the same fixed/allowlisted provider hosts and pinned CC0
+airport source, adding validated-ICAO coordinate fallback under existing bounded
+caches/deadlines. Historical schedule metadata is excluded when fresh live telemetry
+exists, and landed schedules conflicting with airborne observations are suppressed.
+No database or authenticated account feature was introduced. All 34 tests and scoped
+independent review pass. Public JS comparison checked eight loaded assets against all
+three local provider credential values with zero matches; no values were printed.
+The staged source/evidence patch passed Gitleaks with zero findings. Exact production
+and CI verification, screenshots and remaining monitoring limits are in the ledger.

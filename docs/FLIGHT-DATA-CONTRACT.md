@@ -83,6 +83,12 @@ has flown. Ground track rotates the airplane icon clockwise from north. Provider
 coverage and missing fields remain explicit; no claim of every flight/field worldwide
 is made. Exact release/CI and rendered verification are in `TEST-LEDGER.md`.
 
+Release `dfc43013c499ff3faa9860967ce725ee1959fa6a` is deployed and verified on the
+public alias. SWA1781/WN1781 return the dated completed service; UAL1759 returned
+fresh telemetry, a rendered route and all three map markers, including the previously
+missing KOA endpoint. Public browser direction matched the returned track value.
+Public tests do not establish complete worldwide coverage or airline-certified accuracy.
+
 ## Existing schedule key: real compatibility check
 
 A subsequent direct check confirmed the existing local AviationStack key works over

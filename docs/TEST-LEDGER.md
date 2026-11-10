@@ -69,35 +69,35 @@ project's handoff is recorded here and in BRIEF/BACKLOG instead of editing that 
 ## Release state
 
 Max explicitly authorized the production API configuration and deployment on 2026-11-10.
-The release was pushed to `main` at `0fd784019ee12633706cbea77bcc36b663d65fd4`. The
-Production environment is configured with server-side `AVIATION_STACK_KEY` and
-`DATA_SOURCE=hybrid`. The key was restored using the approved local environment-to-Vercel
-CLI path; no value was printed, committed, or written into the PowerKit vault. No database
-or billing setting was changed.
+Release commit `dfc43013c499ff3faa9860967ce725ee1959fa6a` is live at `flight.devxgroup.io`.
+Vercel deployment `dpl_jcPSn5UEfG6piVd5UNQautposn6S` is Ready and Promoted; its Git source
+metadata points to the exact SHA. GitHub Actions run `42808268369` passed install, tests,
+lint and build for that full SHA. Production uses server-side `AVIATION_STACK_KEY` and
+`DATA_SOURCE=hybrid`. No value was printed, committed or written to the PowerKit vault.
+No database write, billing-plan change or provider account creation occurred.
 
-Vercel deployment `dpl_FfiAeCxTtqg8U8A2rteyFjBKyXod` from that exact Git SHA is Ready and
-serves `flight.devxgroup.io`. GitHub Actions run `42804216512` passed for the exact full SHA.
-A public UAL1759 lookup returned HTTP 200 / Active with position source adsb.lol, schedule
-source AviationStack, route data and track 67.55. This proves that lookup, not universal
-coverage. A public SWA1781/WN1781 lookup returned 404 although AviationStack had a
-completed previous-day record. Its actual arrival was more than six hours old, beyond the
-then-current selector window. A focused local hotfix extends only the unique completed
-record fallback to 24 hours, warns when showing records older than six hours, and keeps
-current/upcoming priority and ambiguity rejection. A fresh live aircraft observation now
-suppresses a historical completed schedule, and an airborne position suppresses even a
-current-date schedule that reports Landed. Without a fresh position, the unique historical
-record remains available as schedule-only data. Two additional regressions were found
-on UAL1759: KOA had no local map coordinates, and its past ETA still produced an Early
-badge. The local fix adds validated-ICAO lookup in the pinned VRS airport CSV and
-suppresses expired arrival badges. Parent verified pinned `P/PH.csv` contains PHKO/KOA
-at latitude 19.738800 and longitude -156.046005. These hotfix changes are not yet pushed
-or live.
+Public API checks through the alias:
 
-The existing AviationStack key was not found in the canonical vault during the prior
-names-only/value-safe audit. The current owner-authorized Production configuration does
-not change that separate vault state. Follow the credential-vault rule for future key
-management; do not print or copy the secret. No billing-plan change or database operation
-was performed.
+- SWA1781 returned HTTP 200 / Landed, service date November 9, gate 103, terminal 1.
+  Browser view showed two airport markers, one path, no plane marker or rotation, and the
+  completed-flight notice.
+- WN1781 returned HTTP 200 / Landed through the same alias.
+- UAL1759 returned HTTP 200 / Active with ADS-B and AviationStack sources, KOA coordinates
+  `19.7388, -156.046005`, Denver coordinates from the local airport catalog, two airport
+  markers plus the plane, one route path, heading 63.02 degrees, and matching popup rotation.
+  The expired ETA showed no Early badge.
+
+The 24-hour completed-flight fallback applies only when no fresh position is available.
+Fresh airborne telemetry suppresses a historical completed schedule, and also suppresses
+a current-date schedule that reports Landed. Stale history remains available schedule-only;
+the app does not claim complete airline or worldwide feed coverage. Pinned VRS standing
+data is CC0; AviationStack supplies operational schedule data.
+
+The local key was not found in the canonical vault during the prior names-only audit. Its
+Production configuration was owner-authorized for this release, but no copy was added to
+the vault. Follow the credential-vault rule for future sync and recovery; do not print or
+copy the value. Monitoring and verification of the Vercel log-drain configuration remain
+open; no log-drain endpoint was available to verify.
 
 ## 2026-11-10 rerun on the pushed checkout
 
@@ -108,25 +108,21 @@ was performed.
 - `npm audit --omit=dev`: zero production vulnerabilities.
 - `git diff --check`: passed; no local changes were made during the verification run.
 
-The hotfix's focused regression uses a fixed clock: a unique previous-day completed flight
-12 hours old is accepted schedule-only with null position and an older-record warning; a
-record over 24 hours old and duplicate historical candidates remain unresolved. A current
-service-date schedule still takes priority over a previous-day completed record.
-- Post-history-hotfix `npm test`: 31 passed, 0 failed.
-- Post-hotfix `npm run lint`: 0 errors and the same 7 warnings listed above.
-- Post-hotfix `npm run build`: passed with Next.js 16.4.6.
-- Post-history-hotfix `npm audit --omit=dev`: zero production vulnerabilities; `git diff --check` passed.
-- Latest combined hotfix tests: 34 passed, 0 failed. They cover validated PHKO lookup,
-  unknown-airport null coordinates, schedule-route attribution, completed-record selection,
-  fresh-position precedence over stale/conflicting schedules, and expired ETA behavior.
-- Latest `npm run lint`: zero errors and 7 existing warnings; `npm run build` passed on
-  Next.js 16.4.6; `npm audit --omit=dev` found zero production vulnerabilities; diff check
-  passed. The owner-authorized follow-up deployment is next.
+The final local regression suite passed 34 tests. It covers the fixed-clock 24-hour history
+window, schedule-only fallback, current-service priority, duplicate history rejection,
+fresh-position precedence over historical/conflicting completed schedules, PHKO coordinate
+lookup, unknown-airport nulls, and expired ETA behavior. `npm run lint` completed with zero
+errors and seven existing warnings; `npm run build` passed on Next.js 16.4.6;
+`npm audit --omit=dev` found zero production vulnerabilities; `git diff --check` passed.
 
 The final scoped independent review passed with zero findings at
-`.tmp/crossreview/20261110-033007-review-codex-97iA8p/`. Earlier findings about a
-time-dependent test and historical/live record merging were confirmed and fixed.
-Real local production-build checks returned SWA1781 as a dated schedule-only Landed
-record and UAL1759 as Active with PHKO coordinates. The browser showed three markers,
-one route path and no Early badge from the expired estimate. Public follow-up checks
-will be recorded after deployment. Final staged patch secrets scan found zero findings.
+`.tmp/crossreview/20261110-033007-review-codex-97iA8p/`. Follow-up reviews found and fixed
+a time-dependent history fixture and the historical/live merge conflict; the fresh-position
+precedence regression now covers both prior-day and current-date Landed schedule conflicts.
+Public UAL map and SWA/WN lookup checks were visually reviewed on desktop and mobile. The
+browser viewport audit at 375, 768, 1024 and 1440 pixels found no horizontal overflow or
+invalid date/number output. The eight browser JavaScript assets were compared against the
+three existing provider secret values with zero matches; values were not printed. Latest
+production error-log query returned zero rows. The staged-patch Gitleaks scan had zero
+findings. These checks do not establish a verified log-drain endpoint or complete provider
+coverage.
